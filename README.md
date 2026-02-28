@@ -80,4 +80,4 @@
 ## 📜 License
 Dual-licensed under MIT and the Creative Commons Attribution-NonCommercial (CC BY-NC) for the FiveM community.
 
-**Developed with ❤️ for the elite racing community.**
+**Developed with ❤️ for the Kingplayz..**
