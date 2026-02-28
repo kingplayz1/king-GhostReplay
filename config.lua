@@ -9,7 +9,7 @@ Config.Timestep = 25
 Config.MaxRecordingTimeSeconds = 900
 
 -- Playback visual settings
-Config.GhostAlpha = 150 -- Translucency of the ghost vehicle (0-255)
+Config.GhostAlpha = 255 -- Solid cars (100% opaque)
 Config.MaxActiveGhosts = 5 -- Hard limit on how many ghosts can be playing simultaneously
 
 -- Model cache config
