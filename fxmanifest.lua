@@ -16,6 +16,9 @@ client_scripts {
     'client/track.lua',
     'client/recorder.lua',
     'client/playback.lua',
+    'client/passenger.lua',
+    'client/hud.lua',
+    'client/camera.lua',
     'client/main.lua'
 }
 

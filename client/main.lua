@@ -24,7 +24,9 @@ RegisterCommand("ghostrecord", function(source, args)
         
         -- Automatically send to server as a test
         local testData = {
-            model = GetEntityModel(GetVehiclePedIsIn(PlayerPedId(), false)),
+            model = GhostRecorder.ModelHash,
+            vehicleCosmetics = GhostRecorder.VehicleCosmetics,
+            pedAppearance = GhostRecorder.PedAppearance,
             frames = GhostRecorder.GetRecordedData()
         }
         -- Note: If data is very large, FiveM server events might truncate or fail. 
@@ -65,7 +67,9 @@ AddEventHandler("YourRaceScript:Client:OnRaceFinish", function(completed)
     
     if completed then
         local myData = {
-            model = GetEntityModel(GetVehiclePedIsIn(PlayerPedId(), false)),
+            model = GhostRecorder.ModelHash,
+            vehicleCosmetics = GhostRecorder.VehicleCosmetics,
+            pedAppearance = GhostRecorder.PedAppearance,
             frames = GhostRecorder.GetRecordedData()
         }
         TriggerServerEvent("GhostReplay:Server:SaveGhostData", TrackSystem.CurrentTrack.name, myData)
