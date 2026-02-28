@@ -10,7 +10,7 @@ Config.MaxRecordingTimeSeconds = 900
 
 -- Playback visual settings
 Config.GhostAlpha = 255 -- Solid cars (100% opaque)
-Config.MaxActiveGhosts = 5 -- Hard limit on how many ghosts can be playing simultaneously
+Config.MaxActiveGhosts = 20 -- Increased for Stage 6 Bundles
 
 -- Model cache config
 Config.ModelPreloadTimeout = 5000 -- Max ms to wait for a model to load before giving up
