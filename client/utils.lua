@@ -199,21 +199,21 @@ function Utils.UnpackFrames(packed)
         
         local frame = {
             time = p[1],
-            pos = vector3(p[2], p[3], p[4]),
-            rot = vector3(p[5], p[6], p[7]),
-            steering = p[8],
+            pos = vector3(p[2] or 0, p[3] or 0, p[4] or 0),
+            rot = vector3(p[5] or 0, p[6] or 0, p[7] or 0),
+            steering = p[8] or 0,
             braking = p[9] == 1,
-            rpm = p[10],
-            gear = p[11],
-            throttle = p[12],
+            rpm = p[10] or 0,
+            gear = p[11] or 0,
+            throttle = p[12] or 0,
             siren = p[13] == 1,
             indL = p[14] == 1,
             indR = p[15] == 1,
-            lights = p[16],
-            roof = (p[17] == -1) and nil or p[17],
-            velocity = vector3(p[18], p[19], p[20]),
-            wheelRots = {[0] = p[21], [1] = p[22], [2] = p[23], [3] = p[24]},
-            suspension = {[0] = p[25], [1] = p[26], [2] = p[27], [3] = p[28]}
+            lights = p[16] or 0,
+            roof = (p[17] == -1 or p[17] == nil) and nil or p[17],
+            velocity = (p[18] ~= nil) and vector3(p[18], p[19], p[20]) or vector3(0,0,0),
+            wheelRots = (p[21] ~= nil) and {[0] = p[21], [1] = p[22], [2] = p[23], [3] = p[24]} or nil,
+            suspension = (p[25] ~= nil) and {[0] = p[25], [1] = p[26], [2] = p[27], [3] = p[28]} or nil
         }
         table.insert(frames, frame)
     end
