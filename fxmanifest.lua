@@ -2,7 +2,7 @@ fx_version 'cerulean'
 game 'gta5'
 
 description 'High-Performance Zero-Overhead Ghost Racing Replay System'
-version '1.0.0'
+version '2.3.0'
 
 shared_scripts {
     '@ox_lib/init.lua',
