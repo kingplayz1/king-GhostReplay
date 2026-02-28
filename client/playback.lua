@@ -188,10 +188,23 @@ end
 
 --- Main interpolation thread for smooth playback
 -- Runs every frame (Wait(0)) to interpolate the 25ms data
+-- Elite Part 7: Performance Optimized Interpolation (v2.3)
 Citizen.CreateThread(function()
+    -- Native Caching for Loop Performance
+    local GetGameTimer = GetGameTimer
+    local SetEntityCoordsNoOffset = SetEntityCoordsNoOffset
+    local SetEntityRotation = SetEntityRotation
+    local SetEntityVelocity = SetEntityVelocity
+    local SetVehicleSteeringAngle = SetVehicleSteeringAngle
+    local SetVehicleBrakeLights = SetVehicleBrakeLights
+    local PlayerPedId = PlayerPedId
+    local GetEntityCoords = GetEntityCoords
+    
     while true do
         Wait(0)
         local now = GetGameTimer()
+        local playerPed = PlayerPedId()
+        local playerCoords = GetEntityCoords(playerPed)
         
         for id, ghost in pairs(GhostPlayback.ActiveGhosts) do
             local frames = ghost.data.frames
@@ -232,19 +245,21 @@ Citizen.CreateThread(function()
 
                 local currentRot = vector3(Utils.LerpAngle(frameA.rot.x, frameB.rot.x, t), Utils.LerpAngle(frameA.rot.y, frameB.rot.y, t), Utils.LerpAngle(frameA.rot.z, frameB.rot.z, t))
                 
-                -- Distance-based LOD (Inspired by SP GhostReplay)
-                local playerCoords = GetEntityCoords(PlayerPedId())
+                -- Elite Stage 7: Performance-Strict LOD System
                 local dist = #(currentPos - playerCoords)
-                local isHighLOD = dist < 120.0
+                local isClose = dist < 120.0
+                local isMedium = dist < 200.0
 
-                -- Velocity Syncing (Inspired by SP GhostReplay)
-                local deltaT = (frameB.time - frameA.time) / 1000.0 -- seconds
-                if deltaT > 0 then
-                    local velocity = (vector3(frameB.pos.x, frameB.pos.y, frameB.pos.z) - vector3(frameA.pos.x, frameA.pos.y, frameA.pos.z)) / deltaT
-                    SetEntityVelocity(ghost.vehicle, velocity.x, velocity.y, velocity.z)
+                -- Only apply velocity and steering if close to the player
+                if isClose then
+                    local deltaT = (frameB.time - frameA.time) / 1000.0
+                    if deltaT > 0 then
+                        local velocity = (vector3(frameB.pos.x, frameB.pos.y, frameB.pos.z) - vector3(frameA.pos.x, frameA.pos.y, frameA.pos.z)) / deltaT
+                        SetEntityVelocity(ghost.vehicle, velocity.x, velocity.y, velocity.z)
+                    end
                 end
 
-                -- Update Vehicle
+                -- Primary Teleportation (Always required)
                 SetEntityCoordsNoOffset(ghost.vehicle, currentPos.x, currentPos.y, currentPos.z, false, false, false)
                 SetEntityRotation(ghost.vehicle, currentRot.x, currentRot.y, currentRot.z, 2, true)
                 
@@ -268,7 +283,7 @@ Citizen.CreateThread(function()
                     SetEntityAlpha(ghost.ped, Config.GhostAlpha, false)
                 end
 
-                if isHighLOD then
+                if isClose then
                     SetVehicleSteeringAngle(ghost.vehicle, Utils.Lerp(frameA.steering, frameB.steering, t))
                     
                     -- Wheel and Suspension Sync
@@ -367,10 +382,21 @@ AddEventHandler("GhostReplay:Client:ReceiveLivePacket", function(src, trackName,
     end
 end)
 
--- Elite: Live Ghost Update Loop (Stage 3 & 4)
+-- Elite: Live Ghost Update Loop (Stage 3, 4 & 7 Optimized)
 Citizen.CreateThread(function()
+    local GetGameTimer = GetGameTimer
+    local GetEntityCoords = GetEntityCoords
+    local PlayerPedId = PlayerPedId
+    local SetEntityCoordsNoOffset = SetEntityCoordsNoOffset
+    local SetEntityRotation = SetEntityRotation
+    local DoesEntityExist = DoesEntityExist
+    local DeleteEntity = DeleteEntity
+
     while true do
         local now = GetGameTimer()
+        local playerPed = PlayerPedId()
+        local playerCoords = GetEntityCoords(playerPed)
+
         for src, lg in pairs(GhostPlayback.LiveGhosts) do
             if now - lg.lastUpdate > 5000 then
                 if DoesEntityExist(lg.entity) then DeleteEntity(lg.entity) end
@@ -378,8 +404,11 @@ Citizen.CreateThread(function()
             else
                 if DoesEntityExist(lg.entity) then
                     local currentPos = GetEntityCoords(lg.entity)
-                    -- Stage 4: Use Hermite if possible, otherwise simple lerp
-                    local newPos = currentPos + (lg.targetPos - currentPos) * 0.1
+                    local dist = #(lg.targetPos - playerCoords)
+                    
+                    -- Optimization: Faster Lerp for far ghosts, Hermite for close ones
+                    local lerpFactor = (dist < 50.0) and 0.2 or 0.1
+                    local newPos = currentPos + (lg.targetPos - currentPos) * lerpFactor
                     
                     SetEntityCoordsNoOffset(lg.entity, newPos.x, newPos.y, newPos.z, false, false, false)
                     SetEntityRotation(lg.entity, lg.targetRot.x, lg.targetRot.y, lg.targetRot.z, 2, true)

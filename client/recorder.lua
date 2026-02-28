@@ -6,6 +6,7 @@ GhostRecorder.IsRecording = false
 GhostRecorder.RecordStartTime = 0
 GhostRecorder.LastRunData = nil -- Elite: Stores the last successfully captured run
 GhostRecorder.SessionHistory = {} -- Elite Part 5: List of session recordings
+GhostRecorder.LastPacket = {} -- Elite Part 7: Tracking for Delta Compression
 
 local maxFrames = (Config.MaxRecordingTimeSeconds * 1000) / Config.Timestep
 
@@ -97,16 +98,29 @@ function GhostRecorder.Start()
                 roof = roofState
             })
 
-            -- Elite: Live Streaming (Every 4 frames ~ 100ms)
+            -- Elite Stage 7: Delta Compression (Networking Optimization)
             if frameCount % 4 == 0 then
                 local trackName = (TrackSystem and TrackSystem.CurrentTrack and TrackSystem.CurrentTrack.name) or "test_track"
-                TriggerServerEvent("GhostReplay:Server:StreamPacket", trackName, {
-                    model = GhostRecorder.ModelHash,
-                    pos = pos,
-                    rot = rot,
-                    velocity = velocity,
-                    time = now
-                })
+                
+                -- Check for significant movement or state change
+                local last = GhostRecorder.LastPacket
+                local distMoved = last.pos and #(pos - last.pos) or 10.0
+                local rotChanged = last.rot and #(rot - last.rot) or 10.0
+                local stateChanged = (brakes ~= last.braking) or (siren ~= last.siren) or (indicators ~= last.indicators)
+
+                if distMoved > 0.5 or rotChanged > 2.0 or stateChanged then
+                    TriggerServerEvent("GhostReplay:Server:StreamPacket", trackName, {
+                        model = GhostRecorder.ModelHash,
+                        pos = pos,
+                        rot = rot,
+                        velocity = velocity,
+                        time = now,
+                        braking = brakes,
+                        siren = siren,
+                        indicators = indicators
+                    })
+                    GhostRecorder.LastPacket = { pos = pos, rot = rot, braking = brakes, siren = siren, indicators = indicators }
+                end
             end
             
             frameCount = frameCount + 1
