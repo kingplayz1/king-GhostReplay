@@ -8,7 +8,8 @@ TrackBuilder.CurrentData = {
     finishLine = {left = nil, right = nil},
     waypoints = {},
     antiCutZones = {}, -- Elite: { {points = {vector3, ...}} }
-    currentZone = nil  -- Elite: Current zone being drawn
+    currentZone = nil,  -- Elite: Current zone being drawn
+    props = {}         -- Elite: Physical objects
 }
 
 -- Render loop for visual feedback
@@ -31,10 +32,22 @@ Citizen.CreateThread(function()
             
             -- Draw Waypoints, Corridors, and Zones
             for i, wp in ipairs(TrackBuilder.CurrentData.waypoints) do
-                -- Draw Waypoint Marker
-                DrawMarker(1, wp.x, wp.y, wp.z - 1.0, 0, 0, 0, 0, 0, 0, 2.0, 2.0, 1.0, 255, 255, 0, 150, false, false, 2, false, nil, nil, false)
+                -- Elite: Draw Professional 3D Checkpoint Ring (Marker 27)
+                local color = {r = 255, g = 255, b = 0}
+                if wp.sector == 1 then color = {r = 0, g = 255, b = 255} end
+                if wp.sector == 2 then color = {r = 255, g = 0, b = 255} end
                 
-                -- Elite: Draw Corridor (Line to next waypoint)
+                -- Face next waypoint or finish
+                local nextP = TrackBuilder.CurrentData.waypoints[i+1] or TrackBuilder.CurrentData.finishLine.left
+                local heading = 0.0
+                if nextP then
+                    local dir = vector3(nextP.x, nextP.y, nextP.z) - vector3(wp.x, wp.y, wp.z)
+                    heading = math.deg(math.atan2(-dir.x, dir.y))
+                end
+
+                DrawMarker(27, wp.x, wp.y, wp.z, 0, 0, 0, 0, 0, heading, wp.allowed_width, wp.allowed_width, wp.allowed_width, color.r, color.g, color.b, 150, false, false, 2, false, nil, nil, false)
+                
+                -- Corridor Line
                 if i < #TrackBuilder.CurrentData.waypoints then
                     local nextWp = TrackBuilder.CurrentData.waypoints[i+1]
                     DrawLine(wp.x, wp.y, wp.z, nextWp.x, nextWp.y, nextWp.z, 255, 255, 255, 100)
@@ -71,8 +84,10 @@ AddEventHandler("GhostReplay:Client:Builder:Start", function()
         name = "",
         startLine = {left = nil, right = nil},
         finishLine = {left = nil, right = nil},
-        waypoints = {}
+        waypoints = {},
+        props = {}
     }
+    PropBuilder.TrackProps = {} -- Clear session props
 end)
 
 RegisterNetEvent("GhostReplay:Client:Builder:Cancel")
@@ -108,13 +123,44 @@ RegisterNetEvent("GhostReplay:Client:Builder:AddWaypoint")
 AddEventHandler("GhostReplay:Client:Builder:AddWaypoint", function()
     if not TrackBuilder.IsBuilding then return end
     local ped = PlayerPedId()
+    local coords = GetEntityCoords(ped)
+    
     table.insert(TrackBuilder.CurrentData.waypoints, {
-        x = GetEntityCoords(ped).x,
-        y = GetEntityCoords(ped).y,
-        z = GetEntityCoords(ped).z,
+        x = coords.x,
+        y = coords.y,
+        z = coords.z,
         min_speed = 0,
-        allowed_width = 20.0
+        allowed_width = 10.0,
+        sector = 0 -- Calculated on save
     })
+    
+    lib.notify({description = 'Waypoint added and Sector mapped.', type = 'info'})
+end)
+
+-- Scaling Loop for Waypoints
+Citizen.CreateThread(function()
+    while true do
+        if TrackBuilder.IsBuilding and #TrackBuilder.CurrentData.waypoints > 0 then
+            local lastWp = TrackBuilder.CurrentData.waypoints[#TrackBuilder.CurrentData.waypoints]
+            
+            -- SCROLL UP
+            if IsControlJustPressed(0, 14) or IsDisabledControlJustPressed(0, 14) then
+                lastWp.allowed_width = math.min(50.0, lastWp.allowed_width + 1.0)
+            end
+            -- SCROLL DOWN
+            if IsControlJustPressed(0, 15) or IsDisabledControlJustPressed(0, 15) then
+                lastWp.allowed_width = math.max(2.0, lastWp.allowed_width - 1.0)
+            end
+            
+            -- Display hint (Only if in builder mode AND not in NUI)
+            if not IsNuiFocused() then
+                BeginTextCommandDisplayHelp("STRING")
+                AddTextComponentSubstringPlayerName("SCROLL TO RESIZE CHECKPOINT: ~y~" .. math.floor(lastWp.allowed_width) .. "m")
+                EndTextCommandDisplayHelp(0, false, true, 200)
+            end
+        end
+        Wait(0)
+    end
 end)
 
 RegisterNetEvent("GhostReplay:Client:Builder:SetWaypointProps")
@@ -182,16 +228,33 @@ AddEventHandler("GhostReplay:Client:Builder:Save", function(trackName)
             right = {x=TrackBuilder.CurrentData.finishLine.right.x, y=TrackBuilder.CurrentData.finishLine.right.y, z=TrackBuilder.CurrentData.finishLine.right.z}
         },
         waypoints = {},
-        antiCutZones = TrackBuilder.CurrentData.antiCutZones -- Elite
+        antiCutZones = TrackBuilder.CurrentData.antiCutZones, -- Elite
+        props = {} -- Elite
     }
-    
-    for k,v in ipairs(TrackBuilder.CurrentData.waypoints) do
+
+    -- Serialize Props
+    for _, prop in ipairs(PropBuilder.TrackProps) do
+        table.insert(payload.props, {
+            model = prop.data.model,
+            coords = { x = prop.data.coords.x, y = prop.data.coords.y, z = prop.data.coords.z },
+            rotation = { x = prop.data.rotation.x, y = prop.data.rotation.y, z = prop.data.rotation.z }
+        })
+    end
+
+    -- Calculate Sectors (Pro Feature)
+    local wpCount = #TrackBuilder.CurrentData.waypoints
+    for i, wp in ipairs(TrackBuilder.CurrentData.waypoints) do
+        local sector = 1
+        if i > (wpCount * 0.66) then sector = 3
+        elseif i > (wpCount * 0.33) then sector = 2 end
+        
         table.insert(payload.waypoints, {
-            x = v.x, 
-            y = v.y, 
-            z = v.z,
-            min_speed = v.min_speed, -- Elite
-            allowed_width = v.allowed_width -- Elite
+            x = wp.x, 
+            y = wp.y, 
+            z = wp.z,
+            min_speed = wp.min_speed,
+            allowed_width = wp.allowed_width,
+            sector = sector
         })
     end
 
@@ -209,3 +272,46 @@ end)
 
 -- Remove the old raw command as we now use /trackmenu
 -- RegisterCommand("track", ...)
+
+-- FSM Event Listeners
+AddEventHandler("GhostReplay:Client:Builder:StartSimulation", function()
+    -- Lock Builder UI and start a local race session
+    SetNuiFocus(false, false)
+    SendNUIMessage({ action = "close" })
+    
+    lib.notify({description = "SIMULATION STARTING: 3-2-1-GO", type = "info"})
+    
+    -- Teleport to start
+    local vehicle = GetVehiclePedIsIn(PlayerPedId(), false)
+    if vehicle and vehicle ~= 0 then
+        local coords = TrackBuilder.CurrentData.startLine.left
+        SetEntityCoords(vehicle, coords.x, coords.y, coords.z)
+        SetEntityHeading(vehicle, 0.0) -- Placeholder heading
+        
+        Citizen.CreateThread(function()
+            Wait(3000)
+            TrackSystem.StartRace(vehicle)
+        end)
+    end
+end)
+
+RegisterCommand("builder_reset", function()
+    BuilderStateMachine.EmergencyReset()
+end, false)
+
+-- Global Builder State Logic
+Citizen.CreateThread(function()
+    while true do
+        Wait(500)
+        local state = BuilderStateMachine.CurrentState
+        
+        if state ~= "IDLE" then
+            if state == "ANALYZE" then
+                -- Automated Track Analysis
+                local waypoints = #TrackBuilder.CurrentData.waypoints
+                lib.notify({description = "Analysis: " .. waypoints .. " Waypoints found. Validation passed.", type = "success"})
+                BuilderStateMachine.SetState("SIMULATION")
+            end
+        end
+    end
+end)

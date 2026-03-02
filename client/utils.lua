@@ -327,6 +327,28 @@ function Utils.AnalyzeTrack(trackData)
     }
 end
 
+--- Elite: Converts rotation (Pitch, Roll, Yaw) to Forward, Right, and Up vectors
+function Utils.RotationToVectors(rotation)
+    local z = math.rad(rotation.z)
+    local x = math.rad(rotation.x)
+    local y = math.rad(rotation.y)
+    local num = math.abs(math.cos(x))
+    
+    local forward = vector3(-math.sin(z) * num, math.cos(z) * num, math.sin(x))
+    local right = vector3(math.cos(z) * math.cos(y), math.sin(z) * math.cos(y), math.sin(y))
+    local up = vector3(math.sin(x) * math.sin(z), -math.sin(x) * math.cos(z), math.cos(x))
+    
+    return forward, right, up
+end
+
+--- Elite: Converts rotation to a single forward direction vector
+function Utils.RotationToDirection(rotation)
+    local z = math.rad(rotation.z)
+    local x = math.rad(rotation.x)
+    local num = math.abs(math.cos(x))
+    return vector3(-math.sin(z) * num, math.cos(z) * num, math.sin(x))
+end
+
 function Utils.DebugPrint(msg)
     if Config.Debug then
         print("^3[GhostReplay]^7 " .. tostring(msg))

@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GhostReplay Elite Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+
+<body>
+    <!-- TABLET FRAME -->
+    <div id="tablet-wrapper" style="display: none;">
+        <div class="tablet-bezel">
+            <div class="tablet-camera"></div>
+            <div class="tablet-status-bar">
+                <span class="tablet-clock">12:00</span>
+                <span class="tablet-battery">🔋 98%</span>
+            </div>
+            <div class="tablet-screen">
+                <div id="container">
+                    <nav id="sidebar">
+                        <div class="logo">
+                            <span class="logo-main">GHOST</span>
+                            <span class="logo-sub">REPLAY</span>
+                            <div class="logo-tag">ELITE v2.5</div>
+                        </div>
+
+                        <div class="nav-links">
+                            <div class="nav-item active" data-page="status">
+                                <span class="nav-icon">📊</span> <span>DASHBOARD</span>
+                            </div>
+                            <div class="nav-item" data-page="history">
+                                <span class="nav-icon">📜</span> <span>HISTORY</span>
+                            </div>
+                            <div class="nav-item" data-page="builder">
+                                <span class="nav-icon">🏗️</span> <span>TRACK BUILDER</span>
+                            </div>
+                            <div class="nav-item" data-page="props">
+                                <span class="nav-icon">📦</span> <span>PROP PALETTE</span>
+                            </div>
+                            <div class="nav-item" data-page="settings">
+                                <span class="nav-icon">⚙️</span> <span>SETTINGS</span>
+                            </div>
+                        </div>
+
+                        <div class="nav-footer">
+                            <div class="status-indicator">
+                                <div class="dot green"></div>
+                                <span id="system-status-text">SYSTEM ONLINE</span>
+                            </div>
+                        </div>
+                    </nav>
+
+                    <main id="content">
+                        <!-- STATUS PAGE -->
+                        <section id="page-status" class="page active">
+                            <div class="header">
+                                <h1>REALSIM DASHBOARD</h1>
+                                <div class="track-badge" id="active-track">test_track</div>
+                            </div>
+
+                            <div class="stats-row">
+                                <div class="stat-card">
+                                    <span class="stat-label">LAP TIME PB</span>
+                                    <span class="stat-value" id="pb-time">--:--:---</span>
+                                </div>
+                                <div class="stat-card">
+                                    <span class="stat-label">WORLD RECORD</span>
+                                    <span class="stat-value" id="wr-time">--:--:---</span>
+                                </div>
+                            </div>
+
+                            <div class="main-actions">
+                                <button class="btn btn-large btn-glow" id="start-race">
+                                    <span class="btn-icon">🏎️</span>
+                                    <div class="btn-text">
+                                        <span class="primary">QUICK RACE</span>
+                                        <span class="secondary">START TIMER & RECORDING</span>
+                                    </div>
+                                </button>
+
+                                <button class="btn btn-large" id="grid-start">
+                                    <span class="btn-icon">🏁</span>
+                                    <div class="btn-text">
+                                        <span class="primary">GRID START</span>
+                                        <span class="secondary">SYNC 3-2-1-GO COUNTDOWN</span>
+                                    </div>
+                                </button>
+                            </div>
+
+                            <div class="quick-history">
+                                <h3>LAST RUN</h3>
+                                <div id="last-run-card" class="history-item glow" style="display: none;">
+                                    <span class="hist-time" id="last-run-time">--:--:---</span>
+                                    <button class="btn btn-sm btn-primary" id="replay-last">REPLAY</button>
+                                </div>
+                                <p id="no-last-run" class="empty-state">No laps recorded in this session.</p>
+                            </div>
+
+                            <div class="footer-actions">
+                                <button class="btn btn-danger btn-block" id="clear-ghosts">STOP & CLEAR ALL
+                                    GHOSTS</button>
+                            </div>
+                        </section>
+
+                        <!-- HISTORY PAGE -->
+                        <section id="page-history" class="page">
+                            <h1>SESSION HISTORY</h1>
+                            <div class="history-list" id="history-container">
+                                <!-- History items injected here -->
+                            </div>
+                        </section>
+
+                        <!-- BUILDER PAGE -->
+                        <section id="page-builder" class="page">
+                            <div class="page-flex-layout">
+                                <div class="page-main-content">
+                                    <div class="builder-header">
+                                        <h1>TRACK BUILDER</h1>
+                                        <div class="fsm-status">MODE: <span id="current-builder-state">IDLE</span></div>
+                                    </div>
+
+                                    <div class="mode-selector">
+                                        <button class="mode-btn active" data-state="START_FINISH">START/FINISH</button>
+                                        <button class="mode-btn" data-state="CAPTURE_LINE">CAPTURE LINE</button>
+                                        <button class="mode-btn" data-state="CORRIDOR_EDIT">CORRIDOR</button>
+                                        <button class="mode-btn" data-state="ANTI_CUT_EDIT">ANTI-CUT</button>
+                                        <button class="mode-btn" data-state="PROP_PALETTE">PROPS</button>
+                                        <!-- Shortcut to prop page -->
+                                        <button class="mode-btn" data-state="ANALYZE">ANALYZE</button>
+                                        <button class="mode-btn" data-state="SIMULATION">SIMULATION</button>
+                                    </div>
+
+                                    <div class="grid">
+                                        <div class="card">
+                                            <h3>ORIENTATION</h3>
+                                            <div class="button-stack">
+                                                <button class="btn btn-block" id="build-start-l">SET START
+                                                    (LEFT)</button>
+                                                <button class="btn btn-block" id="build-start-r">SET START
+                                                    (RIGHT)</button>
+                                                <button class="btn btn-block btn-secondary btn-sm"
+                                                    id="build-start-auto">AUTO-LINK TO ARCH</button>
+                                                <div class="divider"></div>
+                                                <button class="btn btn-block" id="build-finish-l">SET FINISH
+                                                    (LEFT)</button>
+                                                <button class="btn btn-block" id="build-finish-r">SET FINISH
+                                                    (RIGHT)</button>
+                                                <button class="btn btn-block btn-secondary btn-sm"
+                                                    id="build-finish-auto">AUTO-LINK TO ARCH</button>
+                                            </div>
+                                        </div>
+                                        <div class="card">
+                                            <h3>GEOMETRY</h3>
+                                            <div class="button-stack">
+                                                <button class="btn btn-primary btn-block" id="build-waypoint">ADD
+                                                    WAYPOINT</button>
+                                                <button class="btn btn-secondary btn-block" id="build-zone">START
+                                                    POLY-ZONE</button>
+                                                <div class="divider"></div>
+                                                <button class="btn btn-block btn-glow" id="build-save">SAVE &
+                                                    FINALIZE</button>
+                                                <button class="btn btn-block btn-danger" id="build-cancel">CANCEL
+                                                    BUILD</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- PROPERTY INSPECTOR -->
+                                <aside class="inspector-sidebar">
+                                    <div class="inspector-header">PROPERTY INSPECTOR</div>
+                                    <div id="inspector-idle" class="inspector-empty">No object selected. Point at
+                                        objects
+                                        and press [F]</div>
+                                    <div id="inspector-active" style="display: none;">
+                                        <div class="inspector-group">
+                                            <label>TRANSFORM</label>
+                                            <div class="inspector-row">
+                                                <span>X</span> <input type="text" id="insp-x" readonly>
+                                                <span>Y</span> <input type="text" id="insp-y" readonly>
+                                                <span>Z</span> <input type="text" id="insp-z" readonly>
+                                            </div>
+                                            <div class="inspector-row">
+                                                <span>RX</span> <input type="text" id="insp-rx" readonly>
+                                                <span>RY</span> <input type="text" id="insp-ry" readonly>
+                                                <span>RZ</span> <input type="text" id="insp-rz" readonly>
+                                            </div>
+                                        </div>
+                                        <div class="inspector-group">
+                                            <label>PROPERTIES</label>
+                                            <div class="inspector-row full">
+                                                <span>MODEL</span> <span id="insp-model" class="val">---</span>
+                                            </div>
+                                            <div class="inspector-row full">
+                                                <span>RADIUS</span> <span id="insp-radius" class="val">---</span>
+                                            </div>
+                                        </div>
+                                        <button class="btn btn-danger btn-block btn-sm" id="insp-delete">DELETE
+                                            PROP</button>
+                                    </div>
+                                </aside>
+                            </div>
+                        </section>
+
+                        <!-- PROPS PAGE -->
+                        <section id="page-props" class="page">
+                            <div class="header">
+                                <h1>PROP PALETTE</h1>
+                                <div class="category-tabs">
+                                    <div class="tab curr active" data-cat="barriers">BARRIERS</div>
+                                    <div class="tab" data-cat="cones">CONES</div>
+                                    <div class="tab" data-cat="lights">LIGHTS</div>
+                                    <div class="tab" data-cat="markers">MARKERS</div>
+                                </div>
+                            </div>
+                            <div class="prop-grid" id="prop-palette">
+                                <!-- Props injected by JS -->
+                            </div>
+                        </section>
+
+                        <!-- SETTINGS PAGE -->
+                        <section id="page-settings" class="page">
+                            <h1>VISUAL SETTINGS</h1>
+                            <div class="settings-list">
+                                <div class="setting-item">
+                                    <div class="setting-info">
+                                        <span class="setting-name">HOLOGRAM MODE</span>
+                                        <span class="setting-desc">Glowing neon ghosts</span>
+                                    </div>
+                                    <input type="checkbox" id="set-hologram" class="switch">
+                                </div>
+                                <div class="setting-item">
+                                    <div class="setting-info">
+                                        <span class="setting-name">CINEMATIC CAMERA</span>
+                                        <span class="setting-desc">Trackside replay angles</span>
+                                    </div>
+                                    <input type="checkbox" id="set-camera" class="switch">
+                                </div>
+                                <div class="setting-item">
+                                    <div class="setting-info">
+                                        <span class="setting-name">GAP HUD</span>
+                                        <span class="setting-desc">Real-time time difference</span>
+                                    </div>
+                                    <input type="checkbox" id="set-hud" class="switch">
+                                </div>
+                                <div class="setting-item">
+                                    <div class="setting-info">
+                                        <span class="setting-name">3D FLOATING NAMES</span>
+                                        <span class="setting-desc">Nametags above ghosts</span>
+                                    </div>
+                                    <input type="checkbox" id="set-labels" class="switch">
+                                </div>
+                            </div>
+                        </section>
+                    </main>
+                </div>
+            </div>
+            <div class="tablet-home"></div>
+        </div>
+    </div>
+
+    <!-- PLACEMENT HUB -->
+    <div id="placement-hud" style="display: none;">
+        <div class="hud-card">
+            <div class="hud-header">PLACEMENT: <span id="current-substate">PREVIEW</span></div>
+            <div class="hud-item sub">DRAG TO AIM</div>
+            <div class="hud-item"><span class="key">LMB</span> CONFIRM</div>
+            <div class="hud-item"><span class="key">RMB</span> CANCEL</div>
+            <div class="hud-item"><span class="key">Q / E</span> ROTATE</div>
+            <div class="hud-item"><span class="key">PGUP / DN</span> ELEVATE</div>
+            <div class="hud-item"><span class="key">G</span> SNAP</div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

@@ -9,9 +9,19 @@ shared_scripts {
     'config.lua'
 }
 
+ui_page 'nui/index.html'
+
+files {
+    'nui/index.html',
+    'nui/style.css',
+    'nui/script.js'
+}
+
 client_scripts {
     'client/utils.lua',
     'client/builder.lua',
+    'client/builder_props.lua',
+    'client/builder_state.lua',
     'client/menu.lua',
     'client/track.lua',
     'client/recorder.lua',

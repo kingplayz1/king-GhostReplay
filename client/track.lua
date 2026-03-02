@@ -11,6 +11,7 @@ TrackSystem.Sectors = {} -- { [1] = timeMs, [2] = timeMs, [3] = timeMs }
 TrackSystem.IsLapDirty = false -- Elite: Invalidation flag
 TrackSystem.PenaltyTime = 0 -- Elite: In ms
 TrackSystem.Violations = 0 -- Elite: Count
+TrackSystem.ActiveProps = {} -- Elite: { [index] = entity }
 TrackSystem.IsRacing = false
 TrackSystem.Vehicle = nil
 
@@ -18,13 +19,62 @@ TrackSystem.Vehicle = nil
 --- Defines the current track parameters
 -- `trackData` should contain: name, type (point/circuit), startLine (left/right vectors), checkpoints(optional)
 function TrackSystem.LoadTrack(trackData)
+    TrackSystem.CleanupProps()
     TrackSystem.CurrentTrack = trackData
     TrackSystem.IsRacing = false
     if trackData then
         Utils.DebugPrint("Track loaded: " .. tostring(trackData.name))
+        TrackSystem.StartPropStreamer()
     else
         Utils.DebugPrint("Track unloaded.")
     end
+end
+
+function TrackSystem.CleanupProps()
+    for _, entity in pairs(TrackSystem.ActiveProps) do
+        if DoesEntityExist(entity) then DeleteEntity(entity) end
+    end
+    TrackSystem.ActiveProps = {}
+end
+
+function TrackSystem.StartPropStreamer()
+    Citizen.CreateThread(function()
+        local tData = TrackSystem.CurrentTrack
+        if not tData or not tData.props then return end
+
+        while TrackSystem.CurrentTrack == tData do
+            local playerCoords = GetEntityCoords(PlayerPedId())
+            
+            for i, p in ipairs(tData.props) do
+                local propCoords = vector3(p.coords.x, p.coords.y, p.coords.z)
+                local dist = #(playerCoords - propCoords)
+                
+                if dist < 300.0 then
+                    if not TrackSystem.ActiveProps[i] then
+                        local hash = GetHashKey(p.model)
+                        if not HasModelLoaded(hash) then
+                            RequestModel(hash)
+                            local wait = 0
+                            while not HasModelLoaded(hash) and wait < 50 do Wait(0); wait = wait + 1 end
+                        end
+                        
+                        if HasModelLoaded(hash) then
+                            local obj = CreateObject(hash, p.coords.x, p.coords.y, p.coords.z, false, false, false)
+                            SetEntityRotation(obj, p.rotation.x, p.rotation.y, p.rotation.z, 2, true)
+                            FreezeEntityPosition(obj, true)
+                            TrackSystem.ActiveProps[i] = obj
+                        end
+                    end
+                else
+                    if TrackSystem.ActiveProps[i] then
+                        DeleteEntity(TrackSystem.ActiveProps[i])
+                        TrackSystem.ActiveProps[i] = nil
+                    end
+                end
+            end
+            Wait(1000)
+        end
+    end)
 end
 
 --- Start racing logic
