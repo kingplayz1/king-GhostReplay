@@ -15,9 +15,6 @@ TrackSystem.ActiveProps = {} -- Elite: { [index] = entity }
 TrackSystem.IsRacing = false
 TrackSystem.Vehicle = nil
 
---- Defines the current track parameters
---- Defines the current track parameters
--- `trackData` should contain: name, type (point/circuit), startLine (left/right vectors), checkpoints(optional)
 function TrackSystem.LoadTrack(trackData)
     TrackSystem.CleanupProps()
     TrackSystem.CurrentTrack = trackData
@@ -25,6 +22,7 @@ function TrackSystem.LoadTrack(trackData)
     if trackData then
         Utils.DebugPrint("Track loaded: " .. tostring(trackData.name))
         TrackSystem.StartPropStreamer()
+        TrackSystem.StartGateStreamer() -- New streamer for gate props
     else
         Utils.DebugPrint("Track unloaded.")
     end
@@ -44,31 +42,62 @@ function TrackSystem.StartPropStreamer()
 
         while TrackSystem.CurrentTrack == tData do
             local playerCoords = GetEntityCoords(PlayerPedId())
-            
             for i, p in ipairs(tData.props) do
                 local propCoords = vector3(p.coords.x, p.coords.y, p.coords.z)
                 local dist = #(playerCoords - propCoords)
-                
-                if dist < 300.0 then
-                    if not TrackSystem.ActiveProps[i] then
+                if dist < 200.0 then
+                    if not TrackSystem.ActiveProps["p"..i] then
                         local hash = GetHashKey(p.model)
-                        if not HasModelLoaded(hash) then
-                            RequestModel(hash)
-                            local wait = 0
-                            while not HasModelLoaded(hash) and wait < 50 do Wait(0); wait = wait + 1 end
-                        end
-                        
-                        if HasModelLoaded(hash) then
-                            local obj = CreateObject(hash, p.coords.x, p.coords.y, p.coords.z, false, false, false)
-                            SetEntityRotation(obj, p.rotation.x, p.rotation.y, p.rotation.z, 2, true)
-                            FreezeEntityPosition(obj, true)
-                            TrackSystem.ActiveProps[i] = obj
-                        end
+                        lib.requestModel(hash)
+                        local obj = CreateObject(hash, p.coords.x, p.coords.y, p.coords.z, true, true, false)
+                        SetEntityRotation(obj, p.rotation.x, p.rotation.y, p.rotation.z, 2, true)
+                        FreezeEntityPosition(obj, true)
+                        TrackSystem.ActiveProps["p"..i] = obj
                     end
                 else
-                    if TrackSystem.ActiveProps[i] then
-                        DeleteEntity(TrackSystem.ActiveProps[i])
-                        TrackSystem.ActiveProps[i] = nil
+                    if TrackSystem.ActiveProps["p"..i] then
+                        DeleteEntity(TrackSystem.ActiveProps["p"..i])
+                        TrackSystem.ActiveProps["p"..i] = nil
+                    end
+                end
+            end
+            Wait(1000)
+        end
+    end)
+end
+
+function TrackSystem.StartGateStreamer()
+    Citizen.CreateThread(function()
+        local tData = TrackSystem.CurrentTrack
+        if not tData or not tData.checkpoints then return end
+
+        while TrackSystem.CurrentTrack == tData do
+            local playerCoords = GetEntityCoords(PlayerPedId())
+            for i, cp in ipairs(tData.checkpoints) do
+                local mid = vector3(cp.midpoint.x, cp.midpoint.y, cp.midpoint.z)
+                local dist = #(playerCoords - mid)
+                
+                -- Rule: Props streamed only within 300 meters
+                if dist < 300.0 then
+                    if not TrackSystem.ActiveProps["g_l"..i] then
+                        local style = TrackProps.GateStyles[cp.styleIndex]
+                        local lHash, rHash = GetHashKey(style.left), GetHashKey(style.right)
+                        lib.requestModel(lHash); lib.requestModel(rHash)
+
+                        local lObj = CreateObject(lHash, cp.left.x, cp.left.y, cp.left.z, true, true, false)
+                        local rObj = CreateObject(rHash, cp.right.x, cp.right.y, cp.right.z, true, true, false)
+                        
+                        SetEntityRotation(lObj, 0.0, 0.0, cp.rotation, 2, true)
+                        SetEntityRotation(rObj, 0.0, 0.0, cp.rotation, 2, true)
+                        FreezeEntityPosition(lObj, true); FreezeEntityPosition(rObj, true)
+                        
+                        TrackSystem.ActiveProps["g_l"..i] = lObj
+                        TrackSystem.ActiveProps["g_r"..i] = rObj
+                    end
+                else
+                    if TrackSystem.ActiveProps["g_l"..i] then
+                        DeleteEntity(TrackSystem.ActiveProps["g_l"..i]); DeleteEntity(TrackSystem.ActiveProps["g_r"..i])
+                        TrackSystem.ActiveProps["g_l"..i] = nil; TrackSystem.ActiveProps["g_r"..i] = nil
                     end
                 end
             end
@@ -148,92 +177,49 @@ function TrackSystem.CheckLapProgress()
 
     local currentPos = GetEntityCoords(TrackSystem.Vehicle)
     local tData = TrackSystem.CurrentTrack
+    local cps = tData.checkpoints
 
-    -- Waypoint checking logic
-    if tData.waypoints and #tData.waypoints > 0 then
-        -- Are we still collecting waypoints?
-        if TrackSystem.CurrentWaypointIdx <= #tData.waypoints then
-            local targetWp = tData.waypoints[TrackSystem.CurrentWaypointIdx]
-            local targetVec = vector3(targetWp.x, targetWp.y, targetWp.z)
+    if cps and #cps > 0 then
+        -- Check current gate
+        if TrackSystem.CurrentWaypointIdx <= #cps then
+            local cp = cps[TrackSystem.CurrentWaypointIdx]
+            local left = vector3(cp.left.x, cp.left.y, cp.left.z)
+            local right = vector3(cp.right.x, cp.right.y, cp.right.z)
             
-            -- Elite: Validation (Speed Check)
-            if #(currentPos - targetVec) < 15.0 then
-                local speedKmh = GetEntitySpeed(TrackSystem.Vehicle) * 3.6
-                if targetWp.min_speed and speedKmh < targetWp.min_speed then
-                    TrackSystem.AddViolation("SLOW SPEED")
-                end
-
-                TrackSystem.CurrentWaypointIdx = TrackSystem.CurrentWaypointIdx + 1
-                
-                -- Elite: Sector Detection
-                local totalWps = #tData.waypoints
-                local sectorSize = math.ceil(totalWps / 3)
-                if TrackSystem.CurrentWaypointIdx % sectorSize == 0 or TrackSystem.CurrentWaypointIdx > totalWps then
-                    local sectorNum = math.min(3, math.ceil(TrackSystem.CurrentWaypointIdx / sectorSize))
-                    if not TrackSystem.Sectors[sectorNum] then
-                        TrackSystem.Sectors[sectorNum] = GetGameTimer() - TrackSystem.LapStartTime
-                        TriggerEvent("GhostReplay:Client:OnSectorComplete", sectorNum, TrackSystem.Sectors[sectorNum])
+            -- Proximity check (30m)
+            local mid = (left + right) / 2.0
+            if #(currentPos - mid) < 30.0 then
+                local crossed, direction = Utils.CrossedLine(TrackSystem.LastPos, currentPos, left, right)
+                if crossed and direction > 0 then
+                    -- Hit!
+                    TrackSystem.CurrentWaypointIdx = TrackSystem.CurrentWaypointIdx + 1
+                    
+                    -- Sector calculation (1, 2, 3)
+                    local total = #cps
+                    local sector = (TrackSystem.CurrentWaypointIdx-1 <= total/3 and 1) or (TrackSystem.CurrentWaypointIdx-1 <= 2*total/3 and 2) or 3
+                    if not TrackSystem.Sectors[sector] then
+                        TrackSystem.Sectors[sector] = GetGameTimer() - TrackSystem.LapStartTime
+                        TriggerEvent("GhostReplay:Client:OnSectorComplete", sector, TrackSystem.Sectors[sector])
                     end
-                end
-                
-                Utils.DebugPrint("Hit waypoint! Moving to " .. TrackSystem.CurrentWaypointIdx)
-            end
 
-            -- Elite: Validation (Corridor Check)
-            -- Check if player is straying too far from the racing line between lastWP and targetWP
-            if TrackSystem.CurrentWaypointIdx > 1 then
-                local prevWp = tData.waypoints[TrackSystem.CurrentWaypointIdx - 1]
-                local prevVec = vector3(prevWp.x, prevWp.y, prevWp.z)
-                local deviation = Utils.GetDistanceToSegment(currentPos, prevVec, targetVec)
-                local allowedWidth = targetWp.allowed_width or 20.0 -- 20m default width
-                
-                if deviation > allowedWidth then
-                    TrackSystem.AddViolation("TRACK LIMITS")
-                end
-            end
+                    -- Play Sound
+                    PlaySoundFrontend(-1, "RACE_PLACE", "HUD_FRONTEND_CUSTOM_SOUND_01", false)
+                    Utils.DebugPrint("Gate #" .. (TrackSystem.CurrentWaypointIdx-1) .. " cleared!")
 
-            -- Elite: Validation (Anti-Cut Zones)
-            if tData.antiCutZones then
-                for _, zone in ipairs(tData.antiCutZones) do
-                    if Utils.IsPointInPolygon(currentPos, zone.points) then
-                        TrackSystem.AddViolation("ANTI-CUT ZONE")
+                    -- Check if it was FINISH
+                    if cp.type == "FINISH" or TrackSystem.CurrentWaypointIdx > #cps then
+                        TrackSystem.EndRace(true)
                     end
                 end
             end
-            
-            TrackSystem.LastPos = currentPos
-            return -- Exit early, we must collect all waypoints before finishing
         end
     end
 
-    -- If we get here, either no waypoints exist or all were collected
-    -- Check Finish Line (Uses directional check to prevent cheating)
-    if tData.finishLine and tData.finishLine.left then
-        local flLeft = vector3(tData.finishLine.left.x, tData.finishLine.left.y, tData.finishLine.left.z)
-        local flRight = vector3(tData.finishLine.right.x, tData.finishLine.right.y, tData.finishLine.right.z)
-        
-        -- Proximity check first to save math
-        local distToFinish = #(currentPos - flLeft)
-        if distToFinish < 100.0 then
-            local crossed, direction = Utils.CrossedLine(TrackSystem.LastPos, currentPos, flLeft, flRight)
-            if crossed and direction > 0 then
-                Utils.DebugPrint("Finish line crossed correctly!")
-                TrackSystem.EndRace(true)
-            elseif crossed and direction <= 0 then
-                Utils.DebugPrint("Crossed finish backwards! Ignoring.")
-            end
-        end
-    else
-        -- Fallback to Start Line if no explicit finish line defined (Circuit loop)
-        local slLeft = vector3(tData.startLine.left.x, tData.startLine.left.y, tData.startLine.left.z)
-        local slRight = vector3(tData.startLine.right.x, tData.startLine.right.y, tData.startLine.right.z)
-        
-        local distToStart = #(currentPos - slLeft)
-        if distToStart < 100.0 then
-            local crossed, direction = Utils.CrossedLine(TrackSystem.LastPos, currentPos, slLeft, slRight)
-            if crossed and direction > 0 then
-                Utils.DebugPrint("Start line crossed correctly! (Circuit lap completed)")
-                TrackSystem.EndRace(true)
+    -- Elite: Validation (Anti-Cut Zones)
+    if tData.antiCutZones then
+        for _, zone in ipairs(tData.antiCutZones) do
+            if Utils.IsPointInPolygon(currentPos, zone.points) then
+                TrackSystem.AddViolation("ANTI-CUT ZONE")
             end
         end
     end

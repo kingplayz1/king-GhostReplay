@@ -354,3 +354,28 @@ function Utils.DebugPrint(msg)
         print("^3[GhostReplay]^7 " .. tostring(msg))
     end
 end
+
+-- ──────────────────────────────────────────────
+-- Safe HUD Text helpers (ox_lib version-agnostic)
+-- lib.showTextUi / hideTextUi don't exist in all
+-- ox_lib versions, so we wrap them safely.
+-- ──────────────────────────────────────────────
+function Utils.ShowHint(text, position)
+    -- Try ox_lib v3 textUi first
+    local ok = pcall(function()
+        lib.showTextUi(text, { position = position or "right-center" })
+    end)
+    if not ok then
+        -- Fallback: native GTA on-screen help text (auto-clears)
+        BeginTextCommandDisplayHelp("STRING")
+        AddTextComponentSubstringPlayerName(text)
+        EndTextCommandDisplayHelp(0, false, true, 5000)
+    end
+end
+
+function Utils.HideHint()
+    pcall(function()
+        lib.hideTextUi()
+    end)
+    -- Native hint clears itself, nothing else needed
+end

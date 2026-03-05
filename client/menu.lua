@@ -25,7 +25,8 @@ function OpenMainMenu()
             pbTime = pbTime,
             wrTime = wrTime,
             lastRun = GhostRecorder.LastRunData and { timeStr = lastRunStr } or nil,
-            builderState = BuilderStateMachine.CurrentState
+            builderState = BuilderFSM and BuilderFSM.Current or "IDLE",
+            isBuilderActive = BuilderFSM and (BuilderFSM.Current ~= BuilderFSM.State.IDLE) or false
         },
         sessionHistory = GhostRecorder.SessionHistory
     })
@@ -104,54 +105,60 @@ end)
 
 -- NUI CALLBACKS: BUILDER
 RegisterNUICallback("buildAction", function(data, cb)
-    if data.type == "setStart" then
-        TriggerEvent("GhostReplay:Client:Builder:SetStart", data.side)
-    elseif data.type == "setFinish" then
-        TriggerEvent("GhostReplay:Client:Builder:SetFinish", data.side)
+    if data.type == "setStart" or data.type == "setFinish" then
+        BuilderFSM.SetState(BuilderFSM.State.START_FINISH_PLACE)
     elseif data.type == "addWaypoint" then
-        TriggerEvent("GhostReplay:Client:Builder:AddWaypoint")
+        BuilderFSM.SetState(BuilderFSM.State.CHECKPOINT_PLACEMENT)
         -- Note: Custom Waypoint props dialog could be added here in NUI if needed
     elseif data.type == "startZone" then
         TriggerEvent("GhostReplay:Client:Builder:StartZone")
     elseif data.type == "autoLink" then
-        -- Find nearest prop and set line
+        -- Find nearest prop and set line (v2 version)
         local ped = PlayerPedId()
         local pos = GetEntityCoords(ped)
         local nearest = nil
-        local minDist = 5.0
+        local minDist = 8.0
         
-        for _, p in ipairs(PropBuilder.TrackProps) do
-            local dist = #(pos - p.data.coords)
+        local allProps = BuilderPropsV2.GetAll()
+        for _, p in ipairs(allProps) do
+            local dist = #(pos - p.coords)
             if dist < minDist then
                 minDist = dist
                 nearest = p
             end
         end
         
+        -- Note: v2 handles start/finish via the START_FINISH_PLACE state loop
+        -- This auto-link helper will notify the user to use the placement tools instead
         if nearest then
-            local rot = nearest.data.rotation
-            local forward = Utils.RotationToDirection(rot)
-            local right = vector3(-forward.y, forward.x, 0.0)
-            local halfWidth = 5.0 -- 10m total width arch
-            
-            local leftPoint = nearest.data.coords + (right * -halfWidth)
-            local rightPoint = nearest.data.coords + (right * halfWidth)
-            
-            if data.side == "start" then
-                TrackBuilder.CurrentData.startLine.left = leftPoint
-                TrackBuilder.CurrentData.startLine.right = rightPoint
-            else
-                TrackBuilder.CurrentData.finishLine.left = leftPoint
-                TrackBuilder.CurrentData.finishLine.right = rightPoint
-            end
-            lib.notify({description = "Linked " .. data.side .. " to nearest arch!", type = "success"})
+            lib.notify({description = "Prop found! Use placement tools (E / SHIFT+E) to link.", type = "info"})
         else
-            lib.notify({description = "No prop found within 5m!", type = "error"})
+            lib.notify({description = "No prop found within 8m!", type = "error"})
         end
     elseif data.type == "save" then
-        -- Placeholder: In v2.4 we'll add the track naming input to NUI
-        TriggerEvent("GhostReplay:Client:Builder:Save", "Custom Track " .. math.random(100, 999))
+        BuilderCore.PromptSave()
+    elseif data.type == "exitBuilder" then
+        BuilderFSM.SetState(BuilderFSM.State.EXIT_BUILDER)
+    elseif data.type == "undo" then
+        BuilderUndo.Undo()
+    elseif data.type == "redo" then
+        BuilderUndo.Redo()
+    elseif data.type == "deleteSelected" then
+        -- Delete the currently selected/previewed prop
+        if BuilderPropsV2 and BuilderPropsV2.SelectedProp then
+            BuilderPropsV2._DeleteProp(BuilderPropsV2.SelectedProp.entity)
+        end
+    elseif data.type == "analyze" then
+        local session = BuilderCore and BuilderCore.GetSession()
+        if session then
+            local meta = BuilderAnalysis.Analyze(session)
+            SendNUIMessage({ action = "trackAnalysis", meta = meta })
+            if meta then
+                lib.notify({ description = BuilderAnalysis.FormatSummary(meta), type = "info" })
+            end
+        end
     elseif data.type == "cancel" then
+        -- Legacy compat
         TriggerEvent("GhostReplay:Client:Builder:Cancel")
     end
     cb("ok")
@@ -184,19 +191,74 @@ RegisterNUICallback("clearGhosts", function(data, cb)
     cb("ok")
 end)
 
-RegisterNUICallback("setBuilderState", function(data, cb)
-    if data.state then
-        BuilderStateMachine.SetState(data.state)
+-- ── v2 FSM state change from NUI mode chips ──
+RegisterNUICallback("setBuilderFSM", function(data, cb)
+    if data.state and BuilderFSM then
+        BuilderFSM.SetState(data.state)
     end
     cb("ok")
 end)
 
+-- ── Legacy compat (old setBuilderState) ──
+RegisterNUICallback("setBuilderState", function(data, cb)
+    if data.state and BuilderFSM then
+        BuilderFSM.SetState(data.state)
+    end
+    cb("ok")
+end)
+
+-- ── Toggle builder mode on/off from NUI button ──
+RegisterNUICallback("toggleBuilderMode", function(data, cb)
+    if not BuilderFSM then cb("ok") return end
+    if BuilderFSM.Current == BuilderFSM.State.IDLE then
+        BuilderFSM.SetState(BuilderFSM.State.ENTER_BUILDER)
+    else
+        BuilderFSM.SetState(BuilderFSM.State.EXIT_BUILDER)
+    end
+    cb("ok")
+end)
+
+-- ── Prop selected from palette ──
 RegisterNUICallback("selectProp", function(data, cb)
-    if data.model then
-        -- Close UI and start placement via state machine
-        BuilderStateMachine.SetState("PLACEMENT")
-        BuilderStateMachine.SetSubState("PLACEMENT", "PREVIEW")
-        PropBuilder.Start(data.model)
+    if data.model and BuilderFSM then
+        -- Switch to PROP_PREVIEW state and set the selected model
+        if BuilderFSM.Current == BuilderFSM.State.IDLE then
+            BuilderFSM.SetState(BuilderFSM.State.ENTER_BUILDER)
+        end
+        BuilderFSM.SetState(BuilderFSM.State.PROP_PREVIEW)
+        -- Set current model on the prop engine
+        if BuilderPropsV2 then
+            -- Find category and index for this model
+            for catIdx, cat in ipairs(TrackPropCategoryOrder) do
+                local list = TrackProps[cat] or {}
+                for propIdx, model in ipairs(list) do
+                    if model == data.model then
+                        BuilderPropsV2.CategoryIndex = catIdx
+                        BuilderPropsV2.PropIndex     = propIdx
+                        BuilderPropsV2._SpawnGhost()
+                        break
+                    end
+                end
+            end
+        end
+        SetNuiFocus(false, false)
+        SendNUIMessage({ action = "minimizeBuilder" })
+    end
+    cb("ok")
+end)
+
+-- ── Runtime builder settings from NUI toggles ──
+RegisterNUICallback("builderSetting", function(data, cb)
+    if not BuilderPropsV2 then cb("ok") return end
+    if data.key == "snapGrid" then
+        BuilderPropsV2.SnapGrid = (data.value == true)
+    elseif data.key == "snapMagnetic" then
+        -- Toggle magnetic snap (used in props.lua _MagneticSnap)
+        BuilderPropsV2._magneticEnabled = (data.value == true)
+    elseif data.key == "snapGround" then
+        BuilderPropsV2.DirectionSnap = (data.value == true)
+    elseif data.key == "gridSize" and type(data.value) == "number" then
+        BuilderPropsV2.GridSize = data.value
     end
     cb("ok")
 end)

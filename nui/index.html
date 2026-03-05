@@ -4,257 +4,279 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GhostReplay Elite Dashboard</title>
+    <title>GhostReplay | Track Builder Pro</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 
 <body>
-    <!-- TABLET FRAME -->
-    <div id="tablet-wrapper" style="display: none;">
+    <div id="tablet-wrapper" style="display:none;">
         <div class="tablet-bezel">
             <div class="tablet-camera"></div>
             <div class="tablet-status-bar">
-                <span class="tablet-clock">12:00</span>
-                <span class="tablet-battery">🔋 98%</span>
+                <span>👑 GHOST RACING PRO</span>
+                <span class="tablet-clock">--:--</span>
+                <span>🔋 100%</span>
             </div>
             <div class="tablet-screen">
+                <!-- LAYOUT -->
                 <div id="container">
+                    <!-- LEFT NAVIGATION -->
                     <nav id="sidebar">
                         <div class="logo">
-                            <span class="logo-main">GHOST</span>
-                            <span class="logo-sub">REPLAY</span>
-                            <div class="logo-tag">ELITE v2.5</div>
+                            <div class="logo-main">GHOST</div>
+                            <div class="logo-sub">RACING</div>
+                            <div class="logo-tag">PRO TRACK SYSTEM</div>
+                        </div>
+                        <div class="nav-list">
+                            <div class="nav-item active" data-page="dashboard">🏁 <span>DASHBOARD</span></div>
+                            <div class="nav-item" data-page="builder">🏗️ <span>TRACK BUILDER</span></div>
+                            <div class="nav-item" data-page="props">📦 <span>PROP PALETTE</span></div>
+                            <div class="nav-item" data-page="history">📋 <span>HISTORY</span></div>
+                            <div class="nav-item" data-page="settings">⚙️ <span>SETTINGS</span></div>
                         </div>
 
-                        <div class="nav-links">
-                            <div class="nav-item active" data-page="status">
-                                <span class="nav-icon">📊</span> <span>DASHBOARD</span>
-                            </div>
-                            <div class="nav-item" data-page="history">
-                                <span class="nav-icon">📜</span> <span>HISTORY</span>
-                            </div>
-                            <div class="nav-item" data-page="builder">
-                                <span class="nav-icon">🏗️</span> <span>TRACK BUILDER</span>
-                            </div>
-                            <div class="nav-item" data-page="props">
-                                <span class="nav-icon">📦</span> <span>PROP PALETTE</span>
-                            </div>
-                            <div class="nav-item" data-page="settings">
-                                <span class="nav-icon">⚙️</span> <span>SETTINGS</span>
-                            </div>
+                        <!-- Builder Mode Toggle -->
+                        <div class="builder-toggle-container">
+                            <button class="btn-builder-toggle" id="builder-toggle-btn">
+                                <span class="toggle-icon">🏗️</span>
+                                <span class="toggle-label" id="builder-toggle-label">ENTER BUILDER</span>
+                                <span class="toggle-status" id="builder-toggle-status">OFF</span>
+                            </button>
                         </div>
-
-                        <div class="nav-footer">
-                            <div class="status-indicator">
-                                <div class="dot green"></div>
-                                <span id="system-status-text">SYSTEM ONLINE</span>
+                        <div class="sidebar-footer">
+                            <div class="build-info" id="builder-badge">
+                                <span class="badge-dot"></span>
+                                <span id="builder-state-badge">IDLE</span>
+                            </div>
+                            <div class="undo-row">
+                                <button class="undo-btn" id="undo-btn" disabled title="Undo (CTRL+Z)">↩</button>
+                                <button class="undo-btn" id="redo-btn" disabled title="Redo (CTRL+Y)">↪</button>
+                                <span class="undo-depth" id="undo-depth">0 / 0</span>
                             </div>
                         </div>
                     </nav>
 
+                    <!-- MAIN CONTENT -->
                     <main id="content">
-                        <!-- STATUS PAGE -->
-                        <section id="page-status" class="page active">
-                            <div class="header">
-                                <h1>REALSIM DASHBOARD</h1>
-                                <div class="track-badge" id="active-track">test_track</div>
-                            </div>
 
-                            <div class="stats-row">
-                                <div class="stat-card">
-                                    <span class="stat-label">LAP TIME PB</span>
-                                    <span class="stat-value" id="pb-time">--:--:---</span>
+                        <!-- ══ DASHBOARD ══ -->
+                        <section id="page-dashboard" class="page active">
+                            <h1>DASHBOARD</h1>
+                            <div class="grid grid-2">
+                                <div class="card accent">
+                                    <h3>ACTIVE TRACK</h3>
+                                    <div class="big-val" id="active-track">None</div>
+                                    <div class="sub-val" id="track-type">---</div>
                                 </div>
-                                <div class="stat-card">
-                                    <span class="stat-label">WORLD RECORD</span>
-                                    <span class="stat-value" id="wr-time">--:--:---</span>
+                                <div class="card">
+                                    <h3>PERSONAL BEST</h3>
+                                    <div class="big-val time" id="pb-time">--:--:---</div>
+                                    <div class="sub-val" id="wr-time">WR: --:--:---</div>
                                 </div>
                             </div>
-
-                            <div class="main-actions">
-                                <button class="btn btn-large btn-glow" id="start-race">
-                                    <span class="btn-icon">🏎️</span>
-                                    <div class="btn-text">
-                                        <span class="primary">QUICK RACE</span>
-                                        <span class="secondary">START TIMER & RECORDING</span>
-                                    </div>
-                                </button>
-
-                                <button class="btn btn-large" id="grid-start">
-                                    <span class="btn-icon">🏁</span>
-                                    <div class="btn-text">
-                                        <span class="primary">GRID START</span>
-                                        <span class="secondary">SYNC 3-2-1-GO COUNTDOWN</span>
-                                    </div>
-                                </button>
-                            </div>
-
-                            <div class="quick-history">
+                            <div class="card" id="last-run-card" style="display:none;">
                                 <h3>LAST RUN</h3>
-                                <div id="last-run-card" class="history-item glow" style="display: none;">
-                                    <span class="hist-time" id="last-run-time">--:--:---</span>
-                                    <button class="btn btn-sm btn-primary" id="replay-last">REPLAY</button>
+                                <div class="big-val time" id="last-run-time">--:--:---</div>
+                                <div class="button-row">
+                                    <button class="btn btn-primary" id="replay-last">▶ INSTANT REPLAY</button>
+                                    <button class="btn btn-secondary" id="grid-start">🚥 GRID START</button>
                                 </div>
-                                <p id="no-last-run" class="empty-state">No laps recorded in this session.</p>
                             </div>
-
-                            <div class="footer-actions">
-                                <button class="btn btn-danger btn-block" id="clear-ghosts">STOP & CLEAR ALL
+                            <div class="empty-state" id="no-last-run">No run recorded yet. Start a quick race!</div>
+                            <div class="button-row">
+                                <button class="btn btn-glow btn-block" id="start-race">⚡ QUICK RACE & RECORD</button>
+                                <button class="btn btn-danger btn-block" id="clear-ghosts">🗑 STOP & CLEAR ALL
                                     GHOSTS</button>
                             </div>
                         </section>
 
-                        <!-- HISTORY PAGE -->
-                        <section id="page-history" class="page">
-                            <h1>SESSION HISTORY</h1>
-                            <div class="history-list" id="history-container">
-                                <!-- History items injected here -->
-                            </div>
-                        </section>
-
-                        <!-- BUILDER PAGE -->
+                        <!-- ══ TRACK BUILDER ══ -->
                         <section id="page-builder" class="page">
-                            <div class="page-flex-layout">
-                                <div class="page-main-content">
-                                    <div class="builder-header">
-                                        <h1>TRACK BUILDER</h1>
-                                        <div class="fsm-status">MODE: <span id="current-builder-state">IDLE</span></div>
-                                    </div>
+                            <div class="page-header">
+                                <h1>TRACK BUILDER</h1>
+                                <div class="state-pill" id="fsm-pill">IDLE</div>
+                            </div>
 
-                                    <div class="mode-selector">
-                                        <button class="mode-btn active" data-state="START_FINISH">START/FINISH</button>
-                                        <button class="mode-btn" data-state="CAPTURE_LINE">CAPTURE LINE</button>
-                                        <button class="mode-btn" data-state="CORRIDOR_EDIT">CORRIDOR</button>
-                                        <button class="mode-btn" data-state="ANTI_CUT_EDIT">ANTI-CUT</button>
-                                        <button class="mode-btn" data-state="PROP_PALETTE">PROPS</button>
-                                        <!-- Shortcut to prop page -->
-                                        <button class="mode-btn" data-state="ANALYZE">ANALYZE</button>
-                                        <button class="mode-btn" data-state="SIMULATION">SIMULATION</button>
-                                    </div>
+                            <!-- Mode Bar -->
+                            <div class="mode-bar">
+                                <button class="mode-chip active" data-state="PROP_PREVIEW">🧱 PROPS</button>
+                                <button class="mode-chip" data-state="CHECKPOINT_PLACEMENT">🚩 CHECKPOINTS</button>
+                                <button class="mode-chip" data-state="START_FINISH_PLACE">🏁 START/FINISH</button>
+                                <button class="mode-chip" data-state="DELETE_MODE">🗑 DELETE</button>
+                                <button class="mode-chip" data-state="PREVIEW_TRACK">▶ PREVIEW</button>
+                                <button class="mode-chip" data-state="SIMULATION_MODE">🏎 SIMULATE</button>
+                            </div>
 
-                                    <div class="grid">
-                                        <div class="card">
-                                            <h3>ORIENTATION</h3>
-                                            <div class="button-stack">
-                                                <button class="btn btn-block" id="build-start-l">SET START
-                                                    (LEFT)</button>
-                                                <button class="btn btn-block" id="build-start-r">SET START
-                                                    (RIGHT)</button>
-                                                <button class="btn btn-block btn-secondary btn-sm"
-                                                    id="build-start-auto">AUTO-LINK TO ARCH</button>
-                                                <div class="divider"></div>
-                                                <button class="btn btn-block" id="build-finish-l">SET FINISH
-                                                    (LEFT)</button>
-                                                <button class="btn btn-block" id="build-finish-r">SET FINISH
-                                                    (RIGHT)</button>
-                                                <button class="btn btn-block btn-secondary btn-sm"
-                                                    id="build-finish-auto">AUTO-LINK TO ARCH</button>
+                            <div class="builder-body">
+                                <!-- Left Panel: Controls -->
+                                <div class="builder-controls">
+                                    <div class="card">
+                                        <h3>🏁 TRACK ACTIONS</h3>
+                                        <div class="button-stack">
+                                            <button class="btn btn-glow btn-block" id="build-save">💾 SAVE &
+                                                FINALIZE</button>
+                                            <button class="btn btn-danger btn-block" id="build-cancel">✖ EXIT
+                                                BUILDER</button>
+                                        </div>
+                                    </div>
+                                    <div class="card">
+                                        <h3>📊 TRACK INFO</h3>
+                                        <div class="info-rows" id="track-info-area">
+                                            <div class="info-row"><span>Class</span><span id="info-class">---</span>
+                                            </div>
+                                            <div class="info-row"><span>Distance</span><span id="info-dist">---</span>
+                                            </div>
+                                            <div class="info-row"><span>Turns</span><span id="info-turns">---</span>
+                                            </div>
+                                            <div class="info-row"><span>Difficulty</span><span id="info-diff">---</span>
+                                            </div>
+                                            <div class="info-row"><span>Props</span><span id="info-props">0</span></div>
+                                            <div class="info-row"><span>Checkpoints</span><span id="info-cps">0</span>
                                             </div>
                                         </div>
-                                        <div class="card">
-                                            <h3>GEOMETRY</h3>
-                                            <div class="button-stack">
-                                                <button class="btn btn-primary btn-block" id="build-waypoint">ADD
-                                                    WAYPOINT</button>
-                                                <button class="btn btn-secondary btn-block" id="build-zone">START
-                                                    POLY-ZONE</button>
-                                                <div class="divider"></div>
-                                                <button class="btn btn-block btn-glow" id="build-save">SAVE &
-                                                    FINALIZE</button>
-                                                <button class="btn btn-block btn-danger" id="build-cancel">CANCEL
-                                                    BUILD</button>
-                                            </div>
+                                        <button class="btn btn-secondary btn-block btn-sm" id="analyze-track">🔍 RUN
+                                            ANALYSIS</button>
+                                    </div>
+                                    <div class="card">
+                                        <h3>⚙️ SNAP SETTINGS</h3>
+                                        <div class="setting-row">
+                                            <span>Grid Snap</span>
+                                            <input type="checkbox" class="switch" id="snap-grid" checked>
+                                        </div>
+                                        <div class="setting-row">
+                                            <span>Magnetic Snap</span>
+                                            <input type="checkbox" class="switch" id="snap-magnetic" checked>
+                                        </div>
+                                        <div class="setting-row">
+                                            <span>Ground Align</span>
+                                            <input type="checkbox" class="switch" id="snap-ground" checked>
                                         </div>
                                     </div>
                                 </div>
 
-                                <!-- PROPERTY INSPECTOR -->
-                                <aside class="inspector-sidebar">
-                                    <div class="inspector-header">PROPERTY INSPECTOR</div>
-                                    <div id="inspector-idle" class="inspector-empty">No object selected. Point at
-                                        objects
-                                        and press [F]</div>
-                                    <div id="inspector-active" style="display: none;">
-                                        <div class="inspector-group">
-                                            <label>TRANSFORM</label>
-                                            <div class="inspector-row">
-                                                <span>X</span> <input type="text" id="insp-x" readonly>
-                                                <span>Y</span> <input type="text" id="insp-y" readonly>
-                                                <span>Z</span> <input type="text" id="insp-z" readonly>
-                                            </div>
-                                            <div class="inspector-row">
-                                                <span>RX</span> <input type="text" id="insp-rx" readonly>
-                                                <span>RY</span> <input type="text" id="insp-ry" readonly>
-                                                <span>RZ</span> <input type="text" id="insp-rz" readonly>
-                                            </div>
-                                        </div>
-                                        <div class="inspector-group">
-                                            <label>PROPERTIES</label>
-                                            <div class="inspector-row full">
-                                                <span>MODEL</span> <span id="insp-model" class="val">---</span>
-                                            </div>
-                                            <div class="inspector-row full">
-                                                <span>RADIUS</span> <span id="insp-radius" class="val">---</span>
+                                <!-- Right Panel: Property Inspector -->
+                                <aside class="inspector-panel">
+                                    <div class="inspector-title">🔬 PROPERTY INSPECTOR</div>
+                                    <div class="inspector-idle" id="inspector-idle">
+                                        <div class="idle-icon">🎯</div>
+                                        <p>Select or preview a prop<br>to see its properties here.</p>
+                                        <p class="hint">Press <kbd>F</kbd> to pick up a prop</p>
+                                    </div>
+                                    <div id="inspector-active" style="display:none;">
+                                        <div class="insp-group">
+                                            <div class="insp-label">POSITION</div>
+                                            <div class="insp-grid-3">
+                                                <div class="insp-field">
+                                                    <label>X</label>
+                                                    <input id="insp-x" type="text" readonly>
+                                                </div>
+                                                <div class="insp-field">
+                                                    <label>Y</label>
+                                                    <input id="insp-y" type="text" readonly>
+                                                </div>
+                                                <div class="insp-field">
+                                                    <label>Z</label>
+                                                    <input id="insp-z" type="text" readonly>
+                                                </div>
                                             </div>
                                         </div>
-                                        <button class="btn btn-danger btn-block btn-sm" id="insp-delete">DELETE
-                                            PROP</button>
+                                        <div class="insp-group">
+                                            <div class="insp-label">ROTATION</div>
+                                            <div class="insp-grid-3">
+                                                <div class="insp-field">
+                                                    <label>P</label>
+                                                    <input id="insp-rx" type="text" readonly>
+                                                </div>
+                                                <div class="insp-field">
+                                                    <label>R</label>
+                                                    <input id="insp-ry" type="text" readonly>
+                                                </div>
+                                                <div class="insp-field">
+                                                    <label>H</label>
+                                                    <input id="insp-rz" type="text" readonly>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="insp-group">
+                                            <div class="insp-label">OBJECT</div>
+                                            <div class="insp-kv"><span>Model</span><span id="insp-model"
+                                                    class="insp-val">---</span></div>
+                                            <div class="insp-kv"><span>Grid</span><span id="insp-snap"
+                                                    class="insp-val">---</span></div>
+                                        </div>
+                                        <button class="btn btn-danger btn-block btn-sm" id="insp-delete">🗑 DELETE
+                                            OBJECT</button>
                                     </div>
                                 </aside>
                             </div>
                         </section>
 
-                        <!-- PROPS PAGE -->
+                        <!-- ══ PROP PALETTE ══ -->
                         <section id="page-props" class="page">
-                            <div class="header">
-                                <h1>PROP PALETTE</h1>
-                                <div class="category-tabs">
-                                    <div class="tab curr active" data-cat="barriers">BARRIERS</div>
-                                    <div class="tab" data-cat="cones">CONES</div>
-                                    <div class="tab" data-cat="lights">LIGHTS</div>
-                                    <div class="tab" data-cat="markers">MARKERS</div>
-                                </div>
+                            <h1>PROP PALETTE</h1>
+                            <div class="cat-tabs" id="cat-tabs">
+                                <!-- Injected by JS from config data -->
                             </div>
-                            <div class="prop-grid" id="prop-palette">
-                                <!-- Props injected by JS -->
+                            <div class="prop-grid" id="prop-grid">
+                                <!-- Injected by JS -->
                             </div>
                         </section>
 
-                        <!-- SETTINGS PAGE -->
+                        <!-- ══ HISTORY ══ -->
+                        <section id="page-history" class="page">
+                            <h1>SESSION HISTORY</h1>
+                            <div class="history-list" id="history-container">
+                                <div class="empty-state">No session history yet.</div>
+                            </div>
+                        </section>
+
+                        <!-- ══ SETTINGS ══ -->
                         <section id="page-settings" class="page">
-                            <h1>VISUAL SETTINGS</h1>
+                            <h1>SETTINGS</h1>
                             <div class="settings-list">
                                 <div class="setting-item">
                                     <div class="setting-info">
-                                        <span class="setting-name">HOLOGRAM MODE</span>
-                                        <span class="setting-desc">Glowing neon ghosts</span>
+                                        <div class="setting-name">Hologram Ghost Mode</div>
+                                        <div class="setting-desc">Ghost vehicles glow translucent</div>
                                     </div>
-                                    <input type="checkbox" id="set-hologram" class="switch">
+                                    <input type="checkbox" class="switch" id="set-hologram">
                                 </div>
                                 <div class="setting-item">
                                     <div class="setting-info">
-                                        <span class="setting-name">CINEMATIC CAMERA</span>
-                                        <span class="setting-desc">Trackside replay angles</span>
+                                        <div class="setting-name">Cinematic Replay Camera</div>
+                                        <div class="setting-desc">Trackside camera angles during replay</div>
                                     </div>
-                                    <input type="checkbox" id="set-camera" class="switch">
+                                    <input type="checkbox" class="switch" id="set-cinecam" checked>
                                 </div>
                                 <div class="setting-item">
                                     <div class="setting-info">
-                                        <span class="setting-name">GAP HUD</span>
-                                        <span class="setting-desc">Real-time time difference</span>
+                                        <div class="setting-name">Gap HUD</div>
+                                        <div class="setting-desc">Show time delta vs ghost</div>
                                     </div>
-                                    <input type="checkbox" id="set-hud" class="switch">
+                                    <input type="checkbox" class="switch" id="set-gaphud" checked>
                                 </div>
                                 <div class="setting-item">
                                     <div class="setting-info">
-                                        <span class="setting-name">3D FLOATING NAMES</span>
-                                        <span class="setting-desc">Nametags above ghosts</span>
+                                        <div class="setting-name">Disable Traffic in Builder</div>
+                                        <div class="setting-desc">Remove cars while building a track</div>
                                     </div>
-                                    <input type="checkbox" id="set-labels" class="switch">
+                                    <input type="checkbox" class="switch" id="set-notraffic" checked>
+                                </div>
+                                <div class="setting-item">
+                                    <div class="setting-info">
+                                        <div class="setting-name">Builder Grid Size</div>
+                                        <div class="setting-desc">Snap resolution (metres)</div>
+                                    </div>
+                                    <select class="select" id="set-gridsize">
+                                        <option value="0.25">0.25m</option>
+                                        <option value="0.5">0.5m</option>
+                                        <option value="1.0" selected>1.0m</option>
+                                        <option value="2.0">2.0m</option>
+                                    </select>
                                 </div>
                             </div>
                         </section>
+
                     </main>
                 </div>
             </div>
@@ -262,19 +284,26 @@
         </div>
     </div>
 
-    <!-- PLACEMENT HUB -->
-    <div id="placement-hud" style="display: none;">
+    <!-- PLACEMENT HUD (Premium Overlay) -->
+    <div id="placement-hud" style="display:none;">
         <div class="hud-card">
-            <div class="hud-header">PLACEMENT: <span id="current-substate">PREVIEW</span></div>
-            <div class="hud-item sub">DRAG TO AIM</div>
-            <div class="hud-item"><span class="key">LMB</span> CONFIRM</div>
-            <div class="hud-item"><span class="key">RMB</span> CANCEL</div>
-            <div class="hud-item"><span class="key">Q / E</span> ROTATE</div>
-            <div class="hud-item"><span class="key">PGUP / DN</span> ELEVATE</div>
-            <div class="hud-item"><span class="key">G</span> SNAP</div>
+            <div class="hud-title">🧱 PLACEMENT MODE</div>
+            <div class="hud-row"><kbd>SHIFT</kbd> Toggle Solo/Gate</div>
+            <div class="hud-row"><kbd>E</kbd> Place Object</div>
+            <div class="hud-row"><kbd>← →</kbd> Rotate</div>
+            <div class="hud-row"><kbd>↑ ↓</kbd> Move Forward/Back</div>
+            <div class="hud-row"><kbd>PgUp/Dn</kbd> Elevate</div>
+            <div class="hud-row"><kbd>G</kbd> Toggle Grid Snap</div>
+            <div class="hud-row"><kbd>ALT+Scroll</kbd> Cycle Style/Model</div>
+            <div class="hud-row"><kbd>TAB</kbd> Next Prop Category</div>
+            <div class="hud-row"><kbd>F</kbd> Pick Up Prop</div>
+            <div class="hud-row"><kbd>DEL</kbd> Delete Aimed</div>
+            <div class="hud-row"><kbd>CTRL+Z</kbd> Undo</div>
+            <div class="hud-row"><kbd>RMB</kbd> Exit</div>
         </div>
     </div>
 
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="script.js"></script>
 </body>
 
