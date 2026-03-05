@@ -16,7 +16,6 @@ BuilderFSM.State = {
     PROP_PREVIEW          = "PROP_PREVIEW",
     PROP_PLACEMENT        = "PROP_PLACEMENT",
     CHECKPOINT_PLACEMENT  = "CHECKPOINT_PLACEMENT",
-    START_FINISH_PLACE    = "START_FINISH_PLACE",
     PROP_EDIT_MODE        = "PROP_EDIT_MODE",
     DELETE_MODE           = "DELETE_MODE",
     PREVIEW_TRACK         = "PREVIEW_TRACK",
@@ -29,11 +28,10 @@ BuilderFSM.State = {
 -- Keys = current state. Values = set of allowed next states.
 local _transitions = {
     IDLE                  = { ENTER_BUILDER = true },
-    ENTER_BUILDER         = { PROP_PREVIEW = true, CHECKPOINT_PLACEMENT = true, START_FINISH_PLACE = true, EXIT_BUILDER = true },
-    PROP_PREVIEW          = { PROP_PLACEMENT = true, CHECKPOINT_PLACEMENT = true, START_FINISH_PLACE = true, PROP_EDIT_MODE = true, DELETE_MODE = true, PREVIEW_TRACK = true, SAVE_TRACK = true, EXIT_BUILDER = true },
+    ENTER_BUILDER         = { PROP_PREVIEW = true, CHECKPOINT_PLACEMENT = true, EXIT_BUILDER = true },
+    PROP_PREVIEW          = { PROP_PLACEMENT = true, CHECKPOINT_PLACEMENT = true, PROP_EDIT_MODE = true, DELETE_MODE = true, PREVIEW_TRACK = true, SAVE_TRACK = true, EXIT_BUILDER = true },
     PROP_PLACEMENT        = { PROP_PREVIEW = true, PROP_EDIT_MODE = true, EXIT_BUILDER = true },
     CHECKPOINT_PLACEMENT  = { PROP_PREVIEW = true, PREVIEW_TRACK = true, EXIT_BUILDER = true },
-    START_FINISH_PLACE    = { PROP_PREVIEW = true, EXIT_BUILDER = true },
     PROP_EDIT_MODE        = { PROP_PREVIEW = true, DELETE_MODE = true, EXIT_BUILDER = true },
     DELETE_MODE           = { PROP_PREVIEW = true, EXIT_BUILDER = true },
     PREVIEW_TRACK         = { PROP_PREVIEW = true, SIMULATION_MODE = true, SAVE_TRACK = true, EXIT_BUILDER = true },
@@ -85,6 +83,8 @@ end
 
 -- ── Core Transition ──
 function BuilderFSM.SetState(newState)
+    if newState == BuilderFSM.Current then return true end
+
     -- Emergency override: IDLE and EXIT always allowed
     local isEmergency = (newState == BuilderFSM.State.IDLE or newState == BuilderFSM.State.EXIT_BUILDER)
 
@@ -151,11 +151,6 @@ function BuilderFSM._OnEnter(state)
             BuilderCheckpoints.Active = true
         end
 
-    elseif state == BuilderFSM.State.START_FINISH_PLACE then
-        SetNuiFocus(false, false)
-        SendNUIMessage({ action = "minimizeBuilder" })
-        BuilderCheckpoints.EnterPlacementMode("START_FINISH")
-
     elseif state == BuilderFSM.State.PROP_EDIT_MODE then
         SetNuiFocus(false, false)
         SendNUIMessage({ action = "minimizeBuilder" })
@@ -207,9 +202,6 @@ function BuilderFSM._OnExit(state)
 
     if state == BuilderFSM.State.PROP_PREVIEW or state == BuilderFSM.State.CHECKPOINT_PLACEMENT then
         BuilderPropsV2.Stop()
-        BuilderCheckpoints.ExitPlacementMode()
-
-    elseif state == BuilderFSM.State.START_FINISH_PLACE then
         BuilderCheckpoints.ExitPlacementMode()
 
     elseif state == BuilderFSM.State.PROP_EDIT_MODE then

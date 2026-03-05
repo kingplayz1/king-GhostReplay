@@ -105,9 +105,7 @@ end)
 
 -- NUI CALLBACKS: BUILDER
 RegisterNUICallback("buildAction", function(data, cb)
-    if data.type == "setStart" or data.type == "setFinish" then
-        BuilderFSM.SetState(BuilderFSM.State.START_FINISH_PLACE)
-    elseif data.type == "addWaypoint" then
+    if data.type == "addWaypoint" then
         BuilderFSM.SetState(BuilderFSM.State.CHECKPOINT_PLACEMENT)
         -- Note: Custom Waypoint props dialog could be added here in NUI if needed
     elseif data.type == "startZone" then

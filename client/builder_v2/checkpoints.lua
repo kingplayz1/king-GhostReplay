@@ -69,18 +69,18 @@ function BuilderCheckpoints.Add(data, noUndo)
     data.midpoint = { x = mid.x, y = mid.y, z = mid.z }
     data.width    = #(left - right)
 
-    -- Auto-assign type
-    local count = #BuilderCheckpoints._checkpoints
-    if data.type == nil or data.type == "AUTO" then
-        if count == 0 then
-            data.type = "START"
-        else
-            if count > 0 then
-                BuilderCheckpoints._checkpoints[count].type = "NORMAL"
-                BuilderCheckpoints._RebuildBlip(BuilderCheckpoints._checkpoints[count], count)
-            end
-            data.type = "FINISH"
+    -- Sequential Type Assignment
+    local countBefore = #BuilderCheckpoints._checkpoints
+    if countBefore == 0 then
+        data.type = "START"
+    else
+        data.type = "FINISH"
+        -- Set previous last to NORMAL if it wasn't the first
+        if countBefore > 1 then
+            BuilderCheckpoints._checkpoints[countBefore].type = "NORMAL"
         end
+        -- Ensure first is always START
+        BuilderCheckpoints._checkpoints[1].type = "START"
     end
 
     data.sector = BuilderCheckpoints._CalculateSector(count + 1)
@@ -119,9 +119,14 @@ function BuilderCheckpoints.RemoveById(id, noUndo)
             end
 
             if #BuilderCheckpoints._checkpoints > 0 then
-                BuilderCheckpoints._checkpoints[#BuilderCheckpoints._checkpoints].type = "FINISH"
-                if #BuilderCheckpoints._checkpoints > 0 then
-                    BuilderCheckpoints._checkpoints[1].type = "START"
+                for idx, scp in ipairs(BuilderCheckpoints._checkpoints) do
+                    if idx == 1 then
+                        scp.type = "START"
+                    elseif idx == #BuilderCheckpoints._checkpoints then
+                        scp.type = "FINISH"
+                    else
+                        scp.type = "NORMAL"
+                    end
                 end
             end
 
