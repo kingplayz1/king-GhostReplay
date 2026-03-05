@@ -28,14 +28,14 @@ BuilderFSM.State = {
 -- Keys = current state. Values = set of allowed next states.
 local _transitions = {
     IDLE                  = { ENTER_BUILDER = true },
-    ENTER_BUILDER         = { PROP_PREVIEW = true, CHECKPOINT_PLACEMENT = true, EXIT_BUILDER = true },
-    PROP_PREVIEW          = { PROP_PLACEMENT = true, CHECKPOINT_PLACEMENT = true, PROP_EDIT_MODE = true, DELETE_MODE = true, PREVIEW_TRACK = true, SAVE_TRACK = true, EXIT_BUILDER = true },
-    PROP_PLACEMENT        = { PROP_PREVIEW = true, PROP_EDIT_MODE = true, EXIT_BUILDER = true },
-    CHECKPOINT_PLACEMENT  = { PROP_PREVIEW = true, PREVIEW_TRACK = true, EXIT_BUILDER = true },
-    PROP_EDIT_MODE        = { PROP_PREVIEW = true, DELETE_MODE = true, EXIT_BUILDER = true },
-    DELETE_MODE           = { PROP_PREVIEW = true, EXIT_BUILDER = true },
-    PREVIEW_TRACK         = { PROP_PREVIEW = true, SIMULATION_MODE = true, SAVE_TRACK = true, EXIT_BUILDER = true },
-    SIMULATION_MODE       = { PROP_PREVIEW = true, SAVE_TRACK = true, EXIT_BUILDER = true },
+    ENTER_BUILDER         = { ENTER_BUILDER = true, PROP_PREVIEW = true, CHECKPOINT_PLACEMENT = true, EXIT_BUILDER = true },
+    PROP_PREVIEW          = { PROP_PREVIEW = true, PROP_PLACEMENT = true, CHECKPOINT_PLACEMENT = true, PROP_EDIT_MODE = true, DELETE_MODE = true, PREVIEW_TRACK = true, SAVE_TRACK = true, EXIT_BUILDER = true },
+    PROP_PLACEMENT        = { PROP_PLACEMENT = true, PROP_PREVIEW = true, PROP_EDIT_MODE = true, EXIT_BUILDER = true },
+    CHECKPOINT_PLACEMENT  = { CHECKPOINT_PLACEMENT = true, PROP_PREVIEW = true, PREVIEW_TRACK = true, EXIT_BUILDER = true },
+    PROP_EDIT_MODE        = { PROP_EDIT_MODE = true, PROP_PREVIEW = true, DELETE_MODE = true, EXIT_BUILDER = true },
+    DELETE_MODE           = { DELETE_MODE = true, PROP_PREVIEW = true, EXIT_BUILDER = true },
+    PREVIEW_TRACK         = { PREVIEW_TRACK = true, PROP_PREVIEW = true, SIMULATION_MODE = true, SAVE_TRACK = true, EXIT_BUILDER = true },
+    SIMULATION_MODE       = { SIMULATION_MODE = true, PROP_PREVIEW = true, SAVE_TRACK = true, EXIT_BUILDER = true },
     SAVE_TRACK            = { EXIT_BUILDER = true },
     EXIT_BUILDER          = { IDLE = true },
 }
@@ -83,22 +83,43 @@ end
 
 -- ── Core Transition ──
 function BuilderFSM.SetState(newState)
-    if newState == BuilderFSM.Current then return true end
+    if not newState then return false end
+    
+    -- Super-robust normalization: uppercase, remove all whitespace/symbols
+    local function normalize(s)
+        return tostring(s):upper():gsub("[%s%W]", "")
+    end
+
+    local ns = normalize(newState)
+    local cs = normalize(BuilderFSM.Current)
+
+    -- Self-transition is ALWAYS valid
+    if ns == cs then return true end
 
     -- Emergency override: IDLE and EXIT always allowed
-    local isEmergency = (newState == BuilderFSM.State.IDLE or newState == BuilderFSM.State.EXIT_BUILDER)
+    local isEmergency = (ns == "IDLE" or ns == "EXITBUILDER")
 
     if not isEmergency then
+        -- Find the enum key for newState (handles fuzzy inputs from NUI)
+        local mappedState = nil
+        for key, val in pairs(BuilderFSM.State) do
+            if normalize(val) == ns then
+                mappedState = val
+                break
+            end
+        end
+
         -- Check transition table
         local allowed = _transitions[BuilderFSM.Current]
-        if not allowed or not allowed[newState] then
+        if not allowed or not allowed[mappedState] then
             lib.notify({
                 title = "Builder FSM",
-                description = ("Invalid transition: %s → %s"):format(BuilderFSM.Current, newState),
+                description = ("Invalid transition: %s → %s"):format(BuilderFSM.Current, mappedState),
                 type = "error"
             })
             return false
         end
+        newState = mappedState
 
         -- Run guard logic
         if not _CheckGuards(newState) then return false end

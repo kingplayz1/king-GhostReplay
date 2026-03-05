@@ -78,15 +78,21 @@ function BuilderCheckpoints.Add(data, noUndo)
         -- Set previous last to NORMAL if it wasn't the first
         if countBefore > 1 then
             BuilderCheckpoints._checkpoints[countBefore].type = "NORMAL"
+            local sess = BuilderCore.GetSession()
+            if sess and sess.checkpoints[countBefore] then 
+                sess.checkpoints[countBefore].type = "NORMAL" 
+            end
         end
-        -- Ensure first is always START
+        -- Sync first to START
         BuilderCheckpoints._checkpoints[1].type = "START"
+        local sess = BuilderCore.GetSession()
+        if sess and sess.checkpoints[1] then sess.checkpoints[1].type = "START" end
     end
 
-    data.sector = BuilderCheckpoints._CalculateSector(count + 1)
+    data.sector = BuilderCheckpoints._CalculateSector(countBefore + 1)
     
     -- Blip at midpoint
-    BuilderCheckpoints._RebuildBlip(data, count + 1)
+    BuilderCheckpoints._RebuildBlip(data, countBefore + 1)
 
     table.insert(BuilderCheckpoints._checkpoints, data)
 
@@ -120,12 +126,15 @@ function BuilderCheckpoints.RemoveById(id, noUndo)
 
             if #BuilderCheckpoints._checkpoints > 0 then
                 for idx, scp in ipairs(BuilderCheckpoints._checkpoints) do
-                    if idx == 1 then
-                        scp.type = "START"
-                    elseif idx == #BuilderCheckpoints._checkpoints then
-                        scp.type = "FINISH"
-                    else
-                        scp.type = "NORMAL"
+                    local newType = "NORMAL"
+                    if idx == 1 then newType = "START"
+                    elseif idx == #BuilderCheckpoints._checkpoints then newType = "FINISH" end
+                    
+                    scp.type = newType
+                    -- Sync back to session if exists
+                    local sess = BuilderCore.GetSession()
+                    if sess and sess.checkpoints[idx] then
+                        sess.checkpoints[idx].type = newType
                     end
                 end
             end

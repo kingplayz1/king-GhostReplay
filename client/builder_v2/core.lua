@@ -111,15 +111,24 @@ end
 -- ── Validate payload before sending to server ──
 function BuilderCore.Validate(payload)
     if not payload.name or payload.name == "" then return false, "Track name is empty." end
-    if #payload.checkpoints < 2 then return false, "Need at least 2 checkpoints." end
+    if not payload.checkpoints or #payload.checkpoints < 2 then 
+        return false, ("Need at least 2 checkpoints (got %d)."):format(#(payload.checkpoints or {})) 
+    end
 
     local hasStart, hasFinish = false, false
-    for _, cp in ipairs(payload.checkpoints) do
-        if cp.type == "START"  then hasStart  = true end
-        if cp.type == "FINISH" then hasFinish = true end
+    local debugStr = ""
+    
+    for i, cp in ipairs(payload.checkpoints) do
+        local t = tostring(cp.type or "NONE"):upper()
+        if t == "START"  then hasStart  = true end
+        if t == "FINISH" then hasFinish = true end
+        debugStr = debugStr .. ("[%d:%s] "):format(i, t)
     end
-    if not hasStart  then return false, "Missing START checkpoint." end
-    if not hasFinish then return false, "Missing FINISH checkpoint." end
+
+    print("^3[BuilderCore] Validating track: " .. debugStr .. "^7")
+
+    if not hasStart  then return false, "Missing START checkpoint. Types: " .. debugStr end
+    if not hasFinish then return false, "Missing FINISH checkpoint. Types: " .. debugStr end
 
     return true
 end
