@@ -109,6 +109,12 @@ function BuilderFSM.SetState(newState)
             end
         end
 
+        if not mappedState then
+            print("^1[BuilderFSM] Unknown state requested: " .. tostring(newState) .. "^7")
+            -- Silently fail for unknown states to avoid NUI spam
+            return false
+        end
+
         -- Check transition table
         local allowed = _transitions[BuilderFSM.Current]
         if not allowed or not allowed[mappedState] then
