@@ -119,16 +119,21 @@ function BuilderCore.Validate(payload)
     local debugStr = ""
     
     for i, cp in ipairs(payload.checkpoints) do
+        -- Super-robust type check: normalize to upper
         local t = tostring(cp.type or "NONE"):upper()
         if t == "START"  then hasStart  = true end
         if t == "FINISH" then hasFinish = true end
         debugStr = debugStr .. ("[%d:%s] "):format(i, t)
     end
 
-    print("^3[BuilderCore] Validating track: " .. debugStr .. "^7")
+    Utils.DebugPrint("[BuilderCore] Validating track sequence: " .. debugStr)
 
-    if not hasStart  then return false, "Missing START checkpoint. Types: " .. debugStr end
-    if not hasFinish then return false, "Missing FINISH checkpoint. Types: " .. debugStr end
+    if not hasStart  then 
+        return false, "Missing START checkpoint! (Sequence: " .. debugStr .. ")" 
+    end
+    if not hasFinish then 
+        return false, "Missing FINISH checkpoint! (Sequence: " .. debugStr .. ")" 
+    end
 
     return true
 end

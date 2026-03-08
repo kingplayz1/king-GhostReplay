@@ -194,9 +194,9 @@ AddEventHandler("GhostReplay:OnRaceFinish", function(trackName, timeMs, isDirty)
             GhostRecorder.LastRunData = data -- Persist for instant replay
             table.insert(GhostRecorder.SessionHistory, 1, data) -- Add to head of history
             
-            -- Limit history to 10 entries to save memory
-            if #GhostRecorder.SessionHistory > 10 then
-                table.remove(GhostRecorder.SessionHistory)
+            -- Limit history to 15 entries
+            if #GhostRecorder.SessionHistory > 15 then
+                table.remove(GhostRecorder.SessionHistory, 1)
             end
 
             TriggerServerEvent("GhostReplay:Server:SaveGhostData", trackName, data)

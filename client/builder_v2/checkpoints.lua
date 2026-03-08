@@ -53,6 +53,53 @@ function BuilderCheckpoints.ExitPlacementMode()
 end
 
 -- ──────────────────────────────────────────────
+-- Force Session Sync (Nuclear Option)
+-- ──────────────────────────────────────────────
+-- Re-sorts everything, re-types START/FINISH, and forces session buffer to match
+function BuilderCheckpoints.ForceSyncSession()
+    local session = BuilderCore.GetSession()
+    if not session then return end
+    
+    local cps = BuilderCheckpoints._checkpoints
+    session.checkpoints = {} -- Clear session buffer
+
+    for i, cp in ipairs(cps) do
+        -- 1. Determine Correct Type
+        local newType = "NORMAL"
+        if i == 1 then 
+            newType = "START" 
+        elseif i == #cps and #cps > 1 then 
+            newType = "FINISH" 
+        end
+        
+        -- 2. Update local object
+        cp.type = newType
+        
+        -- 3. Recalculate Sector
+        local total = #cps
+        local frac = (i - 1) / math.max(1, total)
+        cp.sector = (frac < 0.33 and 1) or (frac < 0.66 and 2) or 3
+
+        -- 4. Push to session buffer (Mirroring)
+        table.insert(session.checkpoints, {
+            id         = cp.id,
+            left       = cp.left,
+            right      = cp.right,
+            midpoint   = cp.midpoint,
+            rotation   = cp.rotation,
+            styleIndex = cp.styleIndex,
+            type       = cp.type,
+            sector     = cp.sector,
+        })
+
+        -- 5. Update Blip
+        BuilderCheckpoints._RebuildBlip(cp, i)
+
+        Utils.DebugPrint(("[BuilderCheckpoints] Gate #%d -> %s (Sector %d)"):format(i, newType, cp.sector))
+    end
+end
+
+-- ──────────────────────────────────────────────
 -- Placement Logic
 -- ──────────────────────────────────────────────
 function BuilderCheckpoints.Add(data, noUndo)
@@ -69,41 +116,18 @@ function BuilderCheckpoints.Add(data, noUndo)
     data.midpoint = { x = mid.x, y = mid.y, z = mid.z }
     data.width    = #(left - right)
 
-    -- Sequential Type Assignment (Strict)
+    -- Insert into local list
     table.insert(BuilderCheckpoints._checkpoints, data)
     
-    -- Sync mirror into session first so re-typing affects both
-    local sess = BuilderCore.GetSession()
-    if sess then table.insert(sess.checkpoints, data) end
-
-    -- Full re-typing pass for absolute consistency
-    for idx, scp in ipairs(BuilderCheckpoints._checkpoints) do
-        local newType = "NORMAL"
-        if idx == 1 then newType = "START"
-        elseif idx == #BuilderCheckpoints._checkpoints and #BuilderCheckpoints._checkpoints > 1 then newType = "FINISH" end
-        
-        scp.type = newType
-        if sess and sess.checkpoints[idx] then
-            sess.checkpoints[idx].type = newType
-            print(("^2[BuilderCheckpoints] Sync Gate #%d -> %s (ID:%d)^7"):format(idx, newType, scp.id))
-        else
-            print("^1[BuilderCheckpoints] ERROR: Session out of sync for gate #" .. idx .. "^7")
-        end
-    end
-
-    data.sector = BuilderCheckpoints._CalculateSector(#BuilderCheckpoints._checkpoints)
-    
-    -- Blip at midpoint
-    BuilderCheckpoints._RebuildBlip(data, #BuilderCheckpoints._checkpoints)
+    -- Sync everything
+    BuilderCheckpoints.ForceSyncSession()
 
     -- Undo
     if not noUndo then
         BuilderUndo.Push({ type = BuilderUndo.ActionType.ADD_CHECKPOINT, checkpointId = data.id, before = nil, after = data })
     end
 
-    lib.notify({ description = ("Gate #%d placed!"):format(data.id), type = "success" })
-    BuilderCheckpoints._RecalculateAllSectors()
-    BuilderCheckpoints._RecalculateAllBlips()
+    lib.notify({ description = ("Gate #%d placed!"):format(#BuilderCheckpoints._checkpoints), type = "success" })
     return data
 end
 
@@ -113,29 +137,9 @@ function BuilderCheckpoints.RemoveById(id, noUndo)
             if cp.blip then RemoveBlip(cp.blip) end
             table.remove(BuilderCheckpoints._checkpoints, i)
 
-            local sess = BuilderCore.GetSession()
-            if sess then
-                for j, scp in ipairs(sess.checkpoints) do
-                    if scp.id == id then table.remove(sess.checkpoints, j) break end
-                end
-            end
+            -- Sync everything
+            BuilderCheckpoints.ForceSyncSession()
 
-            -- Full re-typing pass after removal
-            if #BuilderCheckpoints._checkpoints > 0 then
-                for idx, scp in ipairs(BuilderCheckpoints._checkpoints) do
-                    local newType = "NORMAL"
-                    if idx == 1 then newType = "START"
-                    elseif idx == #BuilderCheckpoints._checkpoints and #BuilderCheckpoints._checkpoints > 1 then newType = "FINISH" end
-                    
-                    scp.type = newType
-                    if sess and sess.checkpoints[idx] then
-                        sess.checkpoints[idx].type = newType
-                    end
-                end
-            end
-
-            BuilderCheckpoints._RecalculateAllSectors()
-            BuilderCheckpoints._RecalculateAllBlips()
             lib.notify({ description = "Gate removed.", type = "warning" })
             return
         end

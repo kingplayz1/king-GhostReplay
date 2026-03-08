@@ -27,7 +27,7 @@ BuilderFSM.State = {
 -- ── Legal Transition Table ──
 -- Keys = current state. Values = set of allowed next states.
 local _transitions = {
-    IDLE                  = { ENTER_BUILDER = true },
+    IDLE                  = { IDLE = true, ENTER_BUILDER = true },
     ENTER_BUILDER         = { ENTER_BUILDER = true, PROP_PREVIEW = true, CHECKPOINT_PLACEMENT = true, EXIT_BUILDER = true },
     PROP_PREVIEW          = { PROP_PREVIEW = true, PROP_PLACEMENT = true, CHECKPOINT_PLACEMENT = true, PROP_EDIT_MODE = true, DELETE_MODE = true, PREVIEW_TRACK = true, SAVE_TRACK = true, EXIT_BUILDER = true },
     PROP_PLACEMENT        = { PROP_PLACEMENT = true, PROP_PREVIEW = true, PROP_EDIT_MODE = true, EXIT_BUILDER = true },
@@ -36,8 +36,8 @@ local _transitions = {
     DELETE_MODE           = { DELETE_MODE = true, PROP_PREVIEW = true, EXIT_BUILDER = true },
     PREVIEW_TRACK         = { PREVIEW_TRACK = true, PROP_PREVIEW = true, SIMULATION_MODE = true, SAVE_TRACK = true, EXIT_BUILDER = true },
     SIMULATION_MODE       = { SIMULATION_MODE = true, PROP_PREVIEW = true, SAVE_TRACK = true, EXIT_BUILDER = true },
-    SAVE_TRACK            = { EXIT_BUILDER = true },
-    EXIT_BUILDER          = { IDLE = true },
+    SAVE_TRACK            = { SAVE_TRACK = true, EXIT_BUILDER = true },
+    EXIT_BUILDER          = { EXIT_BUILDER = true, IDLE = true },
 }
 
 -- ── Guard Rules ──
@@ -87,14 +87,19 @@ function BuilderFSM.SetState(newState)
     
     -- Super-robust normalization: uppercase, remove all whitespace/symbols
     local function normalize(s)
-        return tostring(s):upper():gsub("[%s%W]", "")
+        return tostring(s):upper():gsub("[%s%W_]", "")
     end
 
     local ns = normalize(newState)
     local cs = normalize(BuilderFSM.Current)
 
+    Utils.DebugPrint(("[BuilderFSM] Incoming: '%s' (Normalized: '%s')"):format(tostring(newState), ns))
+
     -- Self-transition is ALWAYS valid
-    if ns == cs then return true end
+    if ns == cs then 
+        Utils.DebugPrint(("[BuilderFSM] Already in state %s"):format(cs))
+        return true 
+    end
 
     -- Emergency override: IDLE and EXIT always allowed
     local isEmergency = (ns == "IDLE" or ns == "EXITBUILDER")
@@ -109,15 +114,30 @@ function BuilderFSM.SetState(newState)
             end
         end
 
+        -- Extra NUI Mapping for common lowercase strings
         if not mappedState then
-            print("^1[BuilderFSM] Unknown state requested: " .. tostring(newState) .. "^7")
-            -- Silently fail for unknown states to avoid NUI spam
+            if ns == "CHECKPOINTPLACEMENT" then mappedState = "CHECKPOINT_PLACEMENT"
+            elseif ns == "PROPPREVIEW" then mappedState = "PROP_PREVIEW"
+            elseif ns == "PROPPLACEMENT" then mappedState = "PROP_PLACEMENT"
+            elseif ns == "PROPEDITMODE" then mappedState = "PROP_EDIT_MODE"
+            elseif ns == "DELETEMODE" then mappedState = "DELETE_MODE"
+            elseif ns == "PREVIEWTRACK" then mappedState = "PREVIEW_TRACK"
+            elseif ns == "SIMULATIONMODE" then mappedState = "SIMULATION_MODE"
+            elseif ns == "SAVETRACK" then mappedState = "SAVE_TRACK"
+            elseif ns == "ENTERBUILDER" then mappedState = "ENTER_BUILDER"
+            elseif ns == "EXITBUILDER" then mappedState = "EXIT_BUILDER"
+            end
+        end
+
+        if not mappedState then
+            print("^1[BuilderFSM] Unknown state requested: " .. tostring(newState) .. " (Normalized: " .. ns .. ")^7")
             return false
         end
 
         -- Check transition table
         local allowed = _transitions[BuilderFSM.Current]
         if not allowed or not allowed[mappedState] then
+            print(("^1[BuilderFSM] Illegal transition: %s → %s^7"):format(BuilderFSM.Current, mappedState))
             lib.notify({
                 title = "Builder FSM",
                 description = ("Invalid transition: %s → %s"):format(BuilderFSM.Current, mappedState),
@@ -129,6 +149,10 @@ function BuilderFSM.SetState(newState)
 
         -- Run guard logic
         if not _CheckGuards(newState) then return false end
+    else
+        -- Normalize emergency states to correct enums
+        if ns == "EXITBUILDER" then newState = BuilderFSM.State.EXIT_BUILDER
+        else newState = BuilderFSM.State.IDLE end
     end
 
     local oldState = BuilderFSM.Current

@@ -264,7 +264,10 @@ Citizen.CreateThread(function()
                 SetEntityRotation(ghost.vehicle, currentRot.x, currentRot.y, currentRot.z, 2, true)
                 
                 -- Elite: Opacity handling (v2.1 Solid Mode)
-                if GhostPlayback.Settings.HologramMode then
+                -- Force solid (255) if it's a 'session' chase ghost
+                local isSession = (ghost.data.type == "session")
+                
+                if GhostPlayback.Settings.HologramMode and not isSession then
                     -- Even in hologram mode, respect user's solid car preference if Alpha is 255
                     local pulse = Config.GhostAlpha
                     if Config.GhostAlpha < 255 then
@@ -279,8 +282,10 @@ Citizen.CreateThread(function()
                     SetVehicleCustomPrimaryColour(ghost.vehicle, r, g, b)
                     SetVehicleCustomSecondaryColour(ghost.vehicle, r, g, b)
                 else
-                    SetEntityAlpha(ghost.vehicle, Config.GhostAlpha, false)
-                    SetEntityAlpha(ghost.ped, Config.GhostAlpha, false)
+                    -- For session ghosts OR if hologram is off, use solid alpha
+                    local alpha = isSession and 255 or Config.GhostAlpha
+                    SetEntityAlpha(ghost.vehicle, alpha, false)
+                    SetEntityAlpha(ghost.ped, alpha, false)
                 end
 
                 if isClose then
