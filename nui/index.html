@@ -29,6 +29,7 @@
                         </div>
                         <div class="nav-list">
                             <div class="nav-item active" data-page="dashboard">🏁 <span>DASHBOARD</span></div>
+                            <div class="nav-item" data-page="tracks">🗺️ <span>TRACKS</span></div>
                             <div class="nav-item" data-page="builder">🏗️ <span>TRACK BUILDER</span></div>
                             <div class="nav-item" data-page="props">📦 <span>PROP PALETTE</span></div>
                             <div class="nav-item" data-page="history">📋 <span>HISTORY</span></div>
@@ -84,9 +85,21 @@
                             </div>
                             <div class="empty-state" id="no-last-run">No run recorded yet. Start a quick race!</div>
                             <div class="button-row">
-                                <button class="btn btn-glow btn-block" id="start-race">⚡ QUICK RACE & RECORD</button>
-                                <button class="btn btn-danger btn-block" id="clear-ghosts">🗑 STOP & CLEAR ALL
+                                <button class="btn btn-glow btn-block" id="start-race">⚡ QUICK RACE &amp;
+                                    RECORD</button>
+                                <button class="btn btn-danger btn-block" id="clear-ghosts">🗑 STOP &amp; CLEAR ALL
                                     GHOSTS</button>
+                            </div>
+                        </section>
+
+                        <!-- ══ TRACKS LIST ══ -->
+                        <section id="page-tracks" class="page">
+                            <div class="page-header">
+                                <h1>SAVED TRACKS</h1>
+                                <button class="btn btn-secondary btn-sm" id="refresh-tracks-btn">🔄 REFRESH</button>
+                            </div>
+                            <div class="track-list" id="track-list-container">
+                                <div class="empty-state">Loading tracks...</div>
                             </div>
                         </section>
 

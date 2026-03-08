@@ -1,5 +1,19 @@
 -- Main Entry point for client side ghost logic
 
+-- ── Helper: normalize server record → client-friendly track object ──
+local function _NormalizeTrack(t)
+    if not t then return nil end
+    -- Server stores track_name; alias it to .name for client use
+    t.name = t.name or t.track_name or "Unknown"
+    -- Compatibility: extract checkpoint data from nested track_data if needed
+    if not t.checkpoints and t.track_data then
+        t.checkpoints  = t.track_data.checkpoints
+        t.props        = t.track_data.props
+        t.antiCutZones = t.track_data.antiCutZones
+    end
+    return t
+end
+
 -- Test Commands (For debug/standalone usage)
 RegisterCommand("ghostrecord", function(source, args)
     local action = args[1]
@@ -29,8 +43,6 @@ RegisterCommand("ghostrecord", function(source, args)
             pedAppearance = GhostRecorder.PedAppearance,
             frames = GhostRecorder.GetRecordedData()
         }
-        -- Note: If data is very large, FiveM server events might truncate or fail. 
-        -- In a real setup, compress data or send chunks. For best laps, 30s is fine.
         TriggerServerEvent("GhostReplay:Server:SaveGhostData", TrackSystem.CurrentTrack.name, testData)
     end
 end, false)
@@ -52,7 +64,6 @@ AddEventHandler("GhostReplay:Client:ReceiveGhostData", function(trackName, ghost
 end)
 
 -- Main hook into your race script
--- Modify these event names to match your own race resource (e.g. qb-racing, ox_core loops, etc.)
 RegisterNetEvent("YourRaceScript:Client:OnRaceStart")
 AddEventHandler("YourRaceScript:Client:OnRaceStart", function(trackInfo)
     TrackSystem.LoadTrack(trackInfo)
@@ -84,16 +95,81 @@ Citizen.CreateThread(function()
     TriggerServerEvent("GhostReplay:Server:RequestAllTracks")
 end)
 
+-- ── Sync all tracks on join ──
 RegisterNetEvent("GhostReplay:Client:SyncAllTracks")
 AddEventHandler("GhostReplay:Client:SyncAllTracks", function(tracks)
-    loadedTracks = tracks
+    loadedTracks = {}
+    for _, t in ipairs(tracks) do
+        table.insert(loadedTracks, _NormalizeTrack(t))
+    end
     Utils.DebugPrint("Synchronized " .. #loadedTracks .. " tracks from server.")
+    -- Push list to NUI
+    SendNUIMessage({ action = "updateTrackList", tracks = loadedTracks })
 end)
 
+-- ── Sync newly saved track to all clients ──
 RegisterNetEvent("GhostReplay:Client:SyncNewTrack")
 AddEventHandler("GhostReplay:Client:SyncNewTrack", function(track)
-    table.insert(loadedTracks, track)
-    Utils.DebugPrint("New live track synced: " .. track.name)
+    local t = _NormalizeTrack(track)
+    table.insert(loadedTracks, t)
+    Utils.DebugPrint("New live track synced: " .. t.name)
+    -- Push full updated list to NUI
+    SendNUIMessage({ action = "updateTrackList", tracks = loadedTracks })
+end)
+
+-- ── NUI: Request track list (on demand) ──
+RegisterNUICallback("requestTrackList", function(data, cb)
+    TriggerServerEvent("GhostReplay:Server:RequestAllTracks")
+    cb("ok")
+end)
+
+-- ── NUI: Player picked a track — load it and start the race ──
+RegisterNUICallback("selectTrackAndRace", function(data, cb)
+    local trackId = data.trackId
+    local found = nil
+    for _, t in ipairs(loadedTracks) do
+        if t.track_id == trackId then
+            found = t
+            break
+        end
+    end
+    if not found then
+        lib.notify({ description = "Track not found!", type = "error" })
+        cb("not_found")
+        return
+    end
+
+    local vehicle = GetVehiclePedIsIn(PlayerPedId(), false)
+    if not vehicle or vehicle == 0 then
+        lib.notify({ description = "You must be in a vehicle to start a race!", type = "error" })
+        cb("no_vehicle")
+        return
+    end
+
+    SetNuiFocus(false, false)
+    SendNUIMessage({ action = "close" })
+
+    TrackSystem.LoadTrack(found)
+    TrackSystem.StartRace(vehicle)
+    GhostRecorder.Start()
+
+    lib.notify({ title = "Race Started", description = "🏁 " .. found.name, type = "success" })
+    cb("ok")
+end)
+
+-- ── NUI: Load a specific track (no race, just load) ──
+RegisterNUICallback("loadTrack", function(data, cb)
+    local trackId = data.trackId
+    for _, t in ipairs(loadedTracks) do
+        if t.track_id == trackId then
+            TrackSystem.LoadTrack(t)
+            lib.notify({ description = "Track loaded: " .. t.name, type = "info" })
+            cb("ok")
+            return
+        end
+    end
+    lib.notify({ description = "Track not found!", type = "error" })
+    cb("not_found")
 end)
 
 -- Proximity Scanner Loop (Zero Impact)
@@ -110,8 +186,9 @@ Citizen.CreateThread(function()
             local closestDist = Config.TrackLoadRadius
             
             for _, track in ipairs(loadedTracks) do
-                if track.startLine and track.startLine.left then
-                    local slVec = vector3(track.startLine.left.x, track.startLine.left.y, track.startLine.left.z)
+                if track.checkpoints and track.checkpoints[1] and track.checkpoints[1].midpoint then
+                    local mp = track.checkpoints[1].midpoint
+                    local slVec = vector3(mp.x, mp.y, mp.z)
                     local dist = #(coords - slVec)
                     
                     if dist < closestDist then
@@ -121,11 +198,11 @@ Citizen.CreateThread(function()
                 end
             end
             
-            if closestTrack and (not TrackSystem.CurrentTrack or TrackSystem.CurrentTrack.id ~= closestTrack.id) then
+            if closestTrack and (not TrackSystem.CurrentTrack or TrackSystem.CurrentTrack.track_id ~= closestTrack.track_id) then
                 TrackSystem.LoadTrack(closestTrack)
                 Utils.DebugPrint("Activated nearby track: " .. closestTrack.name)
             elseif not closestTrack and TrackSystem.CurrentTrack then
-                -- Move away from start line -> unload track memory
+                -- Move away from start line → unload track memory
                 TrackSystem.LoadTrack(nil)
             end
         end
@@ -137,6 +214,37 @@ Citizen.CreateThread(function()
         Wait(250) -- Check line crossing at 4Hz to save client frames
         if TrackSystem.IsRacing then
             TrackSystem.CheckLapProgress()
+        end
+    end
+end)
+
+-- ── In-world START / FINISH flag rendering ──
+-- Shows 3D markers over the first (START) and last (FINISH) checkpoints
+-- while a track is loaded. Uses DrawMarker type 4 (vertical flag cylinder).
+Citizen.CreateThread(function()
+    while true do
+        Wait(0)
+        local track = TrackSystem.CurrentTrack
+        if track and track.checkpoints and #track.checkpoints >= 2 then
+            local cps = track.checkpoints
+            local startCp  = cps[1]
+            local finishCp = cps[#cps]
+
+            -- START  → green glow
+            if startCp and startCp.midpoint then
+                local mp = startCp.midpoint
+                DrawMarker(4, mp.x, mp.y, mp.z + 1.5, 0,0,0, 0,0,0, 1.5, 1.5, 3.0, 0, 220, 0, 180, false, true, 2, false, nil, nil, false)
+                DrawMarker(27, mp.x, mp.y, mp.z, 0,0,0, 0,0,0, 10.0, 10.0, 0.3, 0, 220, 0, 80, false, false, 2, false, nil, nil, false)
+            end
+
+            -- FINISH → red glow
+            if finishCp and finishCp.midpoint then
+                local mp = finishCp.midpoint
+                DrawMarker(4, mp.x, mp.y, mp.z + 1.5, 0,0,0, 0,0,0, 1.5, 1.5, 3.0, 220, 0, 0, 180, false, true, 2, false, nil, nil, false)
+                DrawMarker(27, mp.x, mp.y, mp.z, 0,0,0, 0,0,0, 10.0, 10.0, 0.3, 220, 0, 0, 80, false, false, 2, false, nil, nil, false)
+            end
+        else
+            Wait(500) -- no track loaded, sleep longer
         end
     end
 end)

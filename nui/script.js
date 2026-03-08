@@ -14,6 +14,7 @@ $(document).ready(function () {
     let catIcons = {};     // { Cat: "🔶" }
     let activeCategory = null;
     let activePropIndex = 0;
+    let trackListCache = [];   // All saved tracks from server
 
     // ──────────────────────────────────────────────
     // NUI MESSAGE HANDLER
@@ -140,6 +141,12 @@ $(document).ready(function () {
             case 'updateDashboard':
                 updateDashboard(msg.data);
                 break;
+            // ── Track list update ──
+            case 'updateTrackList':
+                trackListCache = msg.tracks || [];
+                renderTrackList(trackListCache);
+                break;
+
         }
     });
 
@@ -161,6 +168,9 @@ $(document).ready(function () {
             if (categories.length > 0 && !activeCategory) {
                 loadCategory(categories[0]);
             }
+        }
+        if (page === 'tracks') {
+            sendAction('requestTrackList', {});
         }
     }
 
@@ -198,10 +208,115 @@ $(document).ready(function () {
     // ──────────────────────────────────────────────
     // DASHBOARD BUTTONS
     // ──────────────────────────────────────────────
-    $('#start-race').click(() => sendAction('startQuickRace'));
+    // Quick Race: open track picker, then start race
+    $('#start-race').click(() => {
+        if (trackListCache.length === 0) {
+            sendAction('requestTrackList', {});
+            setTimeout(() => {
+                if (trackListCache.length === 0) {
+                    alert('No tracks saved yet! Build one first.');
+                    return;
+                }
+                openTrackPicker();
+            }, 800);
+        } else {
+            openTrackPicker();
+        }
+    });
     $('#grid-start').click(() => sendAction('requestGridStart'));
     $('#clear-ghosts').click(() => sendAction('clearGhosts'));
     $('#replay-last').click(() => sendAction('replayLastRun'));
+
+    // Tracks page refresh button
+    $('#refresh-tracks-btn').click(() => sendAction('requestTrackList', {}));
+
+    // ──────────────────────────────────────────────
+    // TRACK PICKER MODAL
+    // ──────────────────────────────────────────────
+    function openTrackPicker() {
+        // Remove old modal if exists
+        $('#track-picker-modal').remove();
+
+        let rows = '';
+        trackListCache.forEach(t => {
+            const dist = t.track_distance ? `${Math.round(t.track_distance)}m` : '---';
+            const diff = t.difficulty || '---';
+            const cps = t.checkpoint_count || '?';
+            rows += `
+                <div class="track-card" data-id="${t.track_id || ''}}">
+                    <div class="track-card-info">
+                        <div class="track-card-name">${t.name || t.track_name || 'Unknown'}</div>
+                        <div class="track-card-meta">${diff} · ${dist} · ${cps} gates · by ${t.creator || '?'}</div>
+                    </div>
+                    <div class="track-card-actions">
+                        <button class="btn btn-glow btn-sm btn-race" data-id="${t.track_id || ''}">⚡ RACE</button>
+                        <button class="btn btn-secondary btn-sm btn-load" data-id="${t.track_id || ''}">📍 LOAD</button>
+                    </div>
+                </div>`;
+        });
+
+        const modal = $(`
+            <div id="track-picker-modal" style="
+                position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+                background:rgba(0,0,0,0.75);z-index:9999;">
+                <div style="
+                    background:#111;border:1px solid rgba(0,220,160,0.4);border-radius:16px;
+                    padding:24px;width:480px;max-height:70vh;overflow-y:auto;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                        <h2 style="margin:0;color:#00dca0;">🏁 SELECT TRACK</h2>
+                        <button id="close-picker" style="background:transparent;border:none;color:#aaa;font-size:20px;cursor:pointer;">✕</button>
+                    </div>
+                    <div id="picker-list">${rows || '<div class="empty-state">No tracks found.</div>'}</div>
+                </div>
+            </div>`);
+
+        $('body').append(modal);
+
+        $('#close-picker').click(() => modal.remove());
+
+        modal.on('click', '.btn-race', function () {
+            const id = $(this).data('id');
+            sendAction('selectTrackAndRace', { trackId: String(id) });
+            modal.remove();
+        });
+
+        modal.on('click', '.btn-load', function () {
+            const id = $(this).data('id');
+            sendAction('loadTrack', { trackId: String(id) });
+            modal.remove();
+        });
+    }
+
+    // ──────────────────────────────────────────────
+    // TRACKS PAGE LIST
+    // ──────────────────────────────────────────────
+    function renderTrackList(tracks) {
+        const container = $('#track-list-container').empty();
+        if (!tracks || tracks.length === 0) {
+            container.append('<div class="empty-state">No tracks saved yet.</div>');
+            return;
+        }
+        tracks.forEach(t => {
+            const dist = t.track_distance ? `${Math.round(t.track_distance)}m` : '---';
+            const diff = t.difficulty || '---';
+            const cps = t.checkpoint_count || '?';
+            const card = $(`
+                <div class="track-card">
+                    <div class="track-card-info">
+                        <div class="track-card-name">${t.name || t.track_name || 'Unknown'}</div>
+                        <div class="track-card-meta">${diff} · ${dist} · ${cps} gates · by ${t.creator || '?'}</div>
+                        <div class="track-card-date">${t.date_created || ''}</div>
+                    </div>
+                    <div class="track-card-actions">
+                        <button class="btn btn-glow btn-sm btn-race" data-id="${t.track_id || ''}">⚡ RACE</button>
+                        <button class="btn btn-secondary btn-sm btn-load" data-id="${t.track_id || ''}">📍 LOAD</button>
+                    </div>
+                </div>`);
+            card.find('.btn-race').click(() => sendAction('selectTrackAndRace', { trackId: String(t.track_id || '') }));
+            card.find('.btn-load').click(() => sendAction('loadTrack', { trackId: String(t.track_id || '') }));
+            container.append(card);
+        });
+    }
 
     // ──────────────────────────────────────────────
     // BUILDER BUTTONS
