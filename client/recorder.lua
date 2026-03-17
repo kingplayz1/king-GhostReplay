@@ -1,4 +1,4 @@
--- Records and maintains lap telemetry 
+    -- Records and maintains lap telemetry 
 
 GhostRecorder = {}
 GhostRecorder.Frames = {}
@@ -163,6 +163,7 @@ AddEventHandler("GhostReplay:OnRaceFinish", function(trackName, timeMs, isDirty)
                     -- If the ghost already has multiple participants, add them all
                     if ghost.data.participants then
                         for _, p in ipairs(ghost.data.participants) do
+                            p.frames = Utils.PackFrames(p.frames) -- Re-pack just in case
                             table.insert(participants, p)
                         end
                     else
@@ -171,7 +172,7 @@ AddEventHandler("GhostReplay:OnRaceFinish", function(trackName, timeMs, isDirty)
                             model = ghost.data.model,
                             vehicleCosmetics = ghost.data.vehicleCosmetics,
                             pedAppearance = ghost.data.pedAppearance,
-                            frames = ghost.data.frames
+                            frames = Utils.PackFrames(ghost.data.frames)
                         })
                     end
                 end

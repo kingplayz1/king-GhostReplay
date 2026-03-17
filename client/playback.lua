@@ -344,7 +344,23 @@ Citizen.CreateThread(function()
                 end
             else
                 -- Playback reached the end
-                GhostPlayback.Stop(id)
+                if not ghost.isFinished then
+                    ghost.isFinished = true
+                    ghost.finishTime = GetGameTimer()
+                    if DoesEntityExist(ghost.vehicle) then
+                        SetEntityVelocity(ghost.vehicle, 0.0, 0.0, 0.0)
+                        SetVehicleBrakeLights(ghost.vehicle, true)
+                        -- Dim the ghost when it finishes
+                        SetEntityAlpha(ghost.vehicle, 100, false)
+                        SetEntityAlpha(ghost.ped, 100, false)
+                    end
+                end
+
+                -- Only delete the ghost if 5 seconds have passed since it finished, 
+                -- AND we are not currently racing (prevents race-condition during bundle save)
+                if not TrackSystem.IsRacing and (GetGameTimer() - ghost.finishTime > 5000) then
+                    GhostPlayback.Stop(id)
+                end
             end
         end
     end
