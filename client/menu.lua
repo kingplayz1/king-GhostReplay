@@ -83,6 +83,9 @@ RegisterNUICallback("playSessionLap", function(data, cb)
         lapData.type = "session"
         lapData.name = "Session Lap"
         TriggerEvent("GhostReplay:Client:ReceiveGhostData", trackName, lapData)
+        
+        SetNuiFocus(false, false)
+        SendNUIMessage({ action = "close" })
     end
     cb("ok")
 end)

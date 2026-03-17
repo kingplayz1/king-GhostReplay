@@ -2,7 +2,7 @@ fx_version 'cerulean'
 game 'gta5'
 
 description 'High-Performance Ghost Racing Replay + Pro Track Builder v2'
-version '3.2.1'
+version '3.2.2'
 
 shared_scripts {
     '@ox_lib/init.lua',

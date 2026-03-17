@@ -55,7 +55,10 @@ end, false)
 
 RegisterNetEvent("GhostReplay:Client:ReceiveGhostData")
 AddEventHandler("GhostReplay:Client:ReceiveGhostData", function(trackName, ghostData)
-    if ghostData and ghostData.frames and #ghostData.frames > 0 then
+    local hasFrames = ghostData and ghostData.frames and #ghostData.frames > 0
+    local hasParticipants = ghostData and ghostData.participants and #ghostData.participants > 0
+
+    if hasFrames or hasParticipants then
         Utils.DebugPrint("Received ghost data for track: " .. trackName .. ". Starting playback.")
         GhostPlayback.Play(ghostData, trackName)
     else
